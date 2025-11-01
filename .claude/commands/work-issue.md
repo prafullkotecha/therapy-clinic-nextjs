@@ -24,29 +24,46 @@ You are working on GitHub issue #{{ISSUE_NUMBER}} for the therapy-clinic-nextjs 
    - Consider TypeScript best practices from CLAUDE.md
    - Consider HIPAA compliance requirements if applicable
 
-4. **Implementation**:
-   - Create a feature branch: `pk/issue-{{ISSUE_NUMBER}}-<description>`
+4. **Create feature branch**:
+   ```bash
+   git checkout -b pk/issue-{{ISSUE_NUMBER}}-<short-description>
+   ```
+   Branch naming: `pk/issue-{{ISSUE_NUMBER}}-<kebab-case-description>`
+   Example: `pk/issue-5-add-client-search`
+
+5. **Implementation**:
    - Follow the patterns in CLAUDE.md and IMPLEMENTATION_PLAN.md
    - Write code with proper TypeScript types (use `interface` for module augmentation)
    - Ensure all PHI fields are encrypted
    - Add tests if required
 
-5. **Testing**:
+6. **Testing**:
    - Run `npm run check:types` - MUST pass
    - Run `npm run lint` - MUST pass
    - Run relevant tests
    - Test database migrations if applicable
 
-6. **Commit**:
+7. **Commit**:
    - Follow conventional commits format
    - Reference the issue: `Closes #{{ISSUE_NUMBER}}`
    - Include co-author: `Co-Authored-By: Claude <noreply@anthropic.com>`
    - Add Claude Code footer
 
-7. **Ask user** if they want you to:
-   - Push the changes
-   - Create a pull request
-   - Continue with next steps
+8. **Push and create PR** (automatic, no asking):
+   ```bash
+   git push -u origin pk/issue-{{ISSUE_NUMBER}}-<description>
+
+   gh pr create \
+     --title "feat: <concise title>" \
+     --body "<PR description with implementation details>" \
+     --label "ready-for-review"
+   ```
+
+9. **Inform user**:
+   - Provide PR URL
+   - Summarize what was done
+   - Note any important decisions or trade-offs
+   - List what to review carefully
 
 ## Context Files to Reference
 

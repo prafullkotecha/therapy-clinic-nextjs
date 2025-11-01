@@ -20,16 +20,36 @@ This directory contains configuration files for Claude Code to work efficiently 
 ## Available Slash Commands
 
 ### `/work-issue {{ISSUE_NUMBER}}`
-Automatically fetch a GitHub issue and work on it end-to-end:
+**Fully automated workflow** - from issue to PR:
 - Fetches issue details from GitHub
+- Creates feature branch `pk/issue-{{NUMBER}}-<description>`
 - Creates implementation plan with TodoWrite
 - Implements the feature following best practices
 - Runs tests and type checks
-- Creates commit with proper format
+- Commits with proper format
+- **Pushes to GitHub automatically**
+- **Creates pull request automatically**
+- Provides PR URL for your review
 
 **Usage:**
 ```
 /work-issue 5
+```
+
+**Result:** PR ready for your review on GitHub!
+
+### `/continue-issue {{ISSUE_NUMBER}}`
+Continue work on existing issue after PR feedback:
+- Switches to existing branch
+- Reads PR feedback and comments
+- Makes requested changes
+- Tests and commits
+- **Pushes updates automatically**
+- Requests re-review
+
+**Usage:**
+```
+/continue-issue 5
 ```
 
 ### `/review-pr {{PR_NUMBER}}`
@@ -112,26 +132,52 @@ Configured in `mcp.json`:
 
 ## Setting Up
 
-### 1. Install MCP Servers (optional, auto-installed on first use)
+### 1. Create GitHub Personal Access Token
 
+**See `GITHUB_TOKEN_SETUP.md` for detailed instructions.**
+
+Quick setup:
+
+1. Go to https://github.com/settings/tokens
+2. Click **"Generate new token (classic)"**
+3. Name: `claude-code-therapy-clinic`
+4. Select scopes:
+   - ✅ `repo` (full control)
+   - ✅ `workflow` (update CI/CD)
+   - ✅ `write:discussion` (optional)
+   - ✅ `read:org` (optional)
+5. Click **"Generate token"**
+6. Copy token (shown once!)
+
+### 2. Set Environment Variable
+
+Add to `~/.bashrc` or `~/.zshrc`:
+
+```bash
+export GITHUB_TOKEN=ghp_your_token_here
+```
+
+Reload shell:
+```bash
+source ~/.bashrc  # or source ~/.zshrc
+```
+
+Verify:
+```bash
+echo $GITHUB_TOKEN
+gh auth status
+```
+
+### 3. Install MCP Servers (Auto-installed on first use)
+
+Optional manual install:
 ```bash
 npm install -g @modelcontextprotocol/server-github
 npm install -g @modelcontextprotocol/server-filesystem
 npm install -g @modelcontextprotocol/server-postgres
 ```
 
-### 2. Set GitHub Token
-
-```bash
-export GITHUB_TOKEN=your_github_personal_access_token
-```
-
-Or add to `~/.bashrc` or `~/.zshrc`:
-```bash
-echo 'export GITHUB_TOKEN=your_token' >> ~/.bashrc
-```
-
-### 3. Start Using
+### 4. Start Using
 
 In any Claude Code session:
 
@@ -139,13 +185,19 @@ In any Claude Code session:
 /work-issue 5
 ```
 
-Claude will automatically:
+Claude will **automatically**:
 1. Load project context from `context.md`
 2. Reference best practices from `CLAUDE.md`
-3. Use GitHub MCP server to fetch issue
-4. Implement the feature
-5. Run all checks
-6. Create proper commit
+3. Fetch issue from GitHub
+4. Create feature branch `pk/issue-5-<description>`
+5. Implement the feature
+6. Run all checks
+7. Commit with proper format
+8. **Push to GitHub**
+9. **Create pull request**
+10. Provide PR URL for your review
+
+**No asking, no manual steps - fully automated!**
 
 ## Typical Workflow
 
@@ -154,26 +206,46 @@ Claude will automatically:
 User: /work-issue 8
 ```
 
-Claude will:
-1. Fetch issue #8 from GitHub
-2. Analyze requirements
-3. Create TodoWrite task list
-4. Implement feature following CLAUDE.md patterns
-5. Run type checks and linting
-6. Commit with proper format
-7. Ask if you want to push/create PR
+Claude automatically:
+1. Fetches issue #8 from GitHub
+2. Creates branch `pk/issue-8-<description>`
+3. Analyzes requirements
+4. Creates TodoWrite task list
+5. Implements feature following CLAUDE.md patterns
+6. Runs type checks and linting
+7. Commits with proper format
+8. **Pushes to GitHub**
+9. **Creates PR**
+10. Provides PR URL
 
-### Reviewing a PR:
+**You then:** Review PR on GitHub, approve or request changes
+
+### Continuing after PR feedback:
+```
+User: /continue-issue 8
+```
+
+Claude automatically:
+1. Switches to branch
+2. Reads PR comments
+3. Makes requested changes
+4. Tests and commits
+5. **Pushes updates**
+6. Notifies you
+
+**You then:** Review updates on GitHub, merge when ready
+
+### Reviewing any PR:
 ```
 User: /review-pr 15
 ```
 
-Claude will:
-1. Fetch PR #15 diff
-2. Review against checklists (TypeScript, HIPAA, security)
-3. Provide categorized feedback
-4. Suggest improvements
-5. Ask if you want to post review as comment
+Claude:
+1. Fetches PR #15 diff
+2. Reviews against checklists (TypeScript, HIPAA, security)
+3. Provides categorized feedback
+4. Suggests improvements
+5. Can post review as comment (if you approve)
 
 ## Customization
 
@@ -205,18 +277,50 @@ Then use it:
 
 ## Examples
 
-### Before (manual context every time):
+### Before Claude Code Configuration:
 ```
 User: Can you work on issue #5? It's about adding client search.
       Remember to use interfaces not types, encrypt PHI fields,
       add audit logging, include tenant filtering, run type checks...
+      Then create a branch, commit, and let me know when I should push.
+
+Claude: [implements feature]
+
+User: Ok push it
+
+Claude: I can't push directly, please run:
+        git push -u origin feature-branch
+
+User: [runs command manually]
+
+User: Now create a PR
+
+Claude: I can't create PRs, please run:
+        gh pr create --title "..." --body "..."
+
+User: [creates PR manually]
 ```
 
-### After (automated):
+### After Claude Code Configuration:
 ```
 User: /work-issue 5
-Claude: [fetches issue, has all context, does everything correctly]
+
+Claude: [Working on issue #5: Add client search functionality]
+        ✓ Fetched issue from GitHub
+        ✓ Created branch pk/issue-5-add-client-search
+        ✓ Implemented search with HIPAA compliance
+        ✓ All tests passing
+        ✓ Pushed to GitHub
+        ✓ Created PR #23
+
+        📋 PR: https://github.com/prafullkotecha/therapy-clinic-nextjs/pull/23
+
+        Ready for your review!
+
+User: [reviews PR on GitHub, merges when ready]
 ```
+
+**That's it!** No manual git commands, no context repetition, no multi-step workflows.
 
 ## Troubleshooting
 

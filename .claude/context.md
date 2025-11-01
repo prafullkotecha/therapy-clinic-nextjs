@@ -86,20 +86,64 @@ if (!checkPermission(userRole, 'clients', 'update', clientId, userId)) {
 }
 ```
 
-## Issue Workflow
+## Issue Workflow (Automated)
 
-When working on GitHub issues:
+### Starting New Work
+```
+User: /work-issue 5
+```
 
-1. Use `/work-issue {{ISSUE_NUMBER}}` slash command
-2. Plan with TodoWrite tool
-3. Follow TypeScript + HIPAA guidelines
-4. Test thoroughly (`npm run check:types && npm run lint`)
-5. Commit with conventional commits
-6. Reference issue: `Closes #{{ISSUE_NUMBER}}`
+Claude will automatically:
+1. Fetch issue #5 from GitHub
+2. Create feature branch: `pk/issue-5-<description>`
+3. Plan with TodoWrite tool
+4. Implement following TypeScript + HIPAA guidelines
+5. Test thoroughly (`npm run check:types && npm run lint`)
+6. Commit with conventional commits
+7. **Push to GitHub automatically**
+8. **Create pull request automatically**
+9. Provide PR URL for your review
 
-## Branch Naming
+### Continuing After PR Feedback
+```
+User: /continue-issue 5
+```
 
-Use prefix `pk/` for all branches:
+Claude will:
+1. Switch to existing branch
+2. Read PR feedback/comments
+3. Make requested changes
+4. Test and commit
+5. **Push updates automatically**
+6. Request re-review
+
+### Review Process
+- **You review PRs on GitHub** (PRs are your breakpoint between tasks)
+- Approve, request changes, or comment
+- Claude handles all git operations automatically
+
+## Branch Naming Convention
+
+Format: `pk/issue-{{NUMBER}}-<kebab-case-description>`
+
+Examples:
 - `pk/issue-5-add-client-search`
-- `pk/fix-auth-redirect`
-- `pk/feature-matching-algorithm`
+- `pk/issue-12-fix-auth-redirect`
+- `pk/issue-23-matching-algorithm`
+
+**Note:** `pk/` prefix indicates branches from Prafull Kotecha
+
+## Git Operations (Fully Automated)
+
+Claude handles automatically:
+- ✅ Branch creation
+- ✅ Commits with proper format
+- ✅ Pushing to remote
+- ✅ PR creation with description
+- ✅ Labeling PRs
+- ✅ Updating PRs after changes
+
+**You handle:**
+- ✅ PR reviews on GitHub
+- ✅ Merge decisions
+- ✅ Deployment approvals
