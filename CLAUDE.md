@@ -34,6 +34,182 @@ Multi-tenant, HIPAA-compliant behavioral therapy clinic management system. Suppo
 - **SMS:** Twilio (with BAA)
 - **Security:** Arcjet (WAF, bot detection)
 
+## TypeScript Best Practices
+
+**CRITICAL:** These guidelines are based on Matt Pocock's Total TypeScript (2025) and TypeScript 5.7/5.8 best practices. **NEVER** compromise type safety or use workarounds. Fix type errors correctly.
+
+### Module Augmentation & Declaration Merging
+
+**Rule #1: ALWAYS use `interface` for module augmentation, NEVER `type`**
+
+```typescript
+// ✅ CORRECT - Uses interface for declaration merging
+declare module 'next-auth' {
+  // Disable the eslint rule that prefers type over interface
+  // eslint-disable-next-line ts/consistent-type-definitions
+  interface Session {
+    user: { roles: string[] } & DefaultSession['user'];
+  }
+}
+
+// ❌ WRONG - type doesn't support declaration merging
+declare module 'next-auth' {
+  type Session = {  // Won't work!
+    user: { roles: string[] } & DefaultSession['user'];
+  };
+}
+```
+
+**Why:** TypeScript's declaration merging only works with `interface`. Using `type` creates a type alias that overwrites instead of merging. This is essential for extending third-party library types.
+
+**Rule #2: Module augmentation files must be in module scope**
+
+```typescript
+// ✅ CORRECT - Has import/export (module scope)
+import type { DefaultSession } from 'next-auth';
+
+declare module 'next-auth' {
+  interface Session { /* ... */ }
+}
+
+// ❌ WRONG - Script scope, augmentation won't work
+declare module 'next-auth' {
+  interface Session { /* ... */ }
+}
+```
+
+**Rule #3: Can only patch existing declarations, not add new top-level ones**
+
+### Type Safety Principles
+
+**1. Declare return types for top-level module functions**
+```typescript
+// ✅ CORRECT - Explicit return type
+export async function getUser(id: string): Promise<User | null> {
+  return await db.query.users.findFirst({ where: eq(users.id, id) });
+}
+
+// ❌ AVOID - Implicit return type (harder for AI/humans to understand)
+export async function getUser(id: string) {
+  return await db.query.users.findFirst({ where: eq(users.id, id) });
+}
+```
+
+**2. Prefer `interface extends` over `type &` for performance**
+```typescript
+// ✅ CORRECT - Better IDE/tsc performance
+interface ExtendedUser extends BaseUser {
+  roles: string[];
+}
+
+// ❌ SLOWER - Intersection types are slower to resolve
+type ExtendedUser = BaseUser & {
+  roles: string[];
+};
+```
+
+**3. Leverage type inference, minimize explicit annotations**
+```typescript
+// ✅ CORRECT - Let TypeScript infer
+const users = await db.select().from(usersTable);  // Type is inferred
+
+// ❌ UNNECESSARY - Redundant annotation
+const users: User[] = await db.select().from(usersTable);
+```
+
+**4. Use branded types for additional type safety**
+```typescript
+// ✅ CORRECT - Prevents mixing string types
+type ClientId = string & { readonly __brand: 'ClientId' };
+type TherapistId = string & { readonly __brand: 'TherapistId' };
+
+function getClient(id: ClientId) { /* ... */ }
+getClient('123' as ClientId);  // Explicit branding required
+```
+
+**5. Understand generics placement matters**
+```typescript
+// ✅ CORRECT - Generic at function level allows inference
+function processItems<T>(items: T[]): T[] { /* ... */ }
+
+// ❌ WRONG - Generic at wrong level
+interface Processor {
+  process<T>(items: T[]): T[];  // May not infer correctly
+}
+```
+
+### Common Patterns
+
+**Assertion Functions & Type Predicates**
+```typescript
+// ✅ Type predicate
+function isClient(user: User): user is Client {
+  return user.type === 'client';
+}
+
+// ✅ Assertion function
+function assertClient(user: User): asserts user is Client {
+  if (user.type !== 'client') throw new Error('Not a client');
+}
+```
+
+**Const Assertions for Literal Types**
+```typescript
+// ✅ CORRECT - Preserves literal types
+const ROLES = ['admin', 'therapist', 'billing'] as const;
+type Role = typeof ROLES[number];  // 'admin' | 'therapist' | 'billing'
+
+// ❌ WRONG - Type widened to string[]
+const ROLES = ['admin', 'therapist', 'billing'];
+type Role = typeof ROLES[number];  // string
+```
+
+### Next-Auth / Auth.js Specific
+
+**Known Issue:** User interface augmentation doesn't always work in callbacks (next-auth v5). Use type assertions if needed:
+
+```typescript
+// In callbacks where User augmentation fails:
+async jwt({ token, account, profile }) {
+  if (account && profile) {
+    token.roles = ((profile as any).realm_access?.roles as string[]) || [];
+  }
+  return token;
+}
+```
+
+### Error Handling
+
+**NEVER use type assertions or `any` to bypass errors.** If you encounter a type error:
+
+1. **Understand the root cause** - What is TypeScript trying to protect you from?
+2. **Fix the types correctly** - Use proper type narrowing, guards, or generics
+3. **Document why** - If a workaround is needed, explain in comments
+
+```typescript
+// ❌ NEVER DO THIS
+const user = data as User;  // Bypassing type safety!
+const result: any = await fetch();  // Losing all type information!
+
+// ✅ DO THIS INSTEAD
+const userResult = UserSchema.safeParse(data);
+if (!userResult.success) throw new Error('Invalid user data');
+const user = userResult.data;
+```
+
+### TypeScript 5.7/5.8 Features (2025)
+
+- **Better error reporting:** Use `--target es2024` for latest ECMAScript features
+- **Granular return type checking:** Conditional expressions in return statements checked per branch
+- **Node.js ESM support:** Can now `require()` ESM modules with `--module nodenext`
+- **V8 compile caching:** Faster subsequent builds in Node.js
+
+### Resources
+
+- [Total TypeScript](https://www.totaltypescript.com/) - Matt Pocock's comprehensive TypeScript training
+- [TypeScript 5.8 Release Notes](https://devblogs.microsoft.com/typescript/announcing-typescript-5-8/)
+- [Auth.js TypeScript Guide](https://authjs.dev/getting-started/typescript)
+
 ## Architecture Overview
 
 ### Multi-Tenancy Design
