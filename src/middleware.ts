@@ -12,6 +12,10 @@ const isProtectedRoute = (pathname: string) => {
   return pathname.includes('/dashboard');
 };
 
+const isAuthRoute = (pathname: string) => {
+  return pathname.includes('/api/auth');
+};
+
 // Improve security with Arcjet
 const aj = arcjet.withRule(
   detectBot({
@@ -26,6 +30,40 @@ const aj = arcjet.withRule(
   }),
 );
 
+/**
+ * Capture IP address and user agent for auth event logging
+ * Stores in HTTP-only cookies that auth callbacks can read
+ */
+function captureRequestContext(request: NextRequest, response: NextResponse): NextResponse {
+  // Extract IP address (prioritize x-forwarded-for for proxied requests)
+  const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    ?? request.headers.get('x-real-ip')
+    ?? 'unknown';
+
+  // Extract user agent
+  const userAgent = request.headers.get('user-agent') ?? 'unknown';
+
+  // Store in HTTP-only secure cookies with 5-minute expiration
+  // Auth callbacks will read these values when logging auth events
+  response.cookies.set('__auth_ip', ipAddress, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 300, // 5 minutes
+    path: '/',
+  });
+
+  response.cookies.set('__auth_ua', userAgent, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 300, // 5 minutes
+    path: '/',
+  });
+
+  return response;
+}
+
 // Currently, with database connections, Webpack is faster than Turbopack in production environment at runtime.
 // Then, unfortunately, Webpack doesn't support `proxy.ts` on Vercel yet, here is the error: "Error: ENOENT: no such file or directory, lstat '/vercel/path0/.next/server/proxy.js'"
 export default async function middleware(
@@ -39,6 +77,13 @@ export default async function middleware(
     if (decision.isDenied()) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+  }
+
+  // Capture request context for auth routes
+  // This enables auth callbacks to log real IP addresses and user agents
+  if (isAuthRoute(request.nextUrl.pathname)) {
+    const response = NextResponse.next();
+    return captureRequestContext(request, response);
   }
 
   // Check authentication for protected routes
