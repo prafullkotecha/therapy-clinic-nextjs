@@ -43,13 +43,38 @@ You are working on GitHub issue #{{ISSUE_NUMBER}} for the therapy-clinic-nextjs 
    - Run relevant tests
    - Test database migrations if applicable
 
-7. **Commit**:
-   - Follow conventional commits format
-   - Reference the issue: `Closes #{{ISSUE_NUMBER}}`
-   - Include co-author: `Co-Authored-By: Claude <noreply@anthropic.com>`
-   - Add Claude Code footer
+7. **Verify application** (CRITICAL):
+   - Start dev server: `npm run dev` (in background)
+   - Wait for "Ready in X.Xs" message
+   - Verify HTTP response: `curl http://localhost:3000`
+   - Check for compilation/runtime errors
+   - Confirm app loads successfully
+   - See `/verify-app` command for details
 
-8. **Push and create PR** (automatic, no asking):
+8. **Commit with DCO sign-off**:
+   - **ALWAYS use `-s` flag** for DCO compliance
+   - Follow conventional commits format
+   - Reference the issue: `Resolves #{{ISSUE_NUMBER}}`
+   - Include co-author and Claude Code footer
+
+   Example:
+   ```bash
+   git add .
+   git commit -s -m "$(cat <<'EOF'
+   feat: implement feature name
+
+   Detailed description of changes.
+
+   Resolves #{{ISSUE_NUMBER}}
+
+   🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+   Co-Authored-By: Claude <noreply@anthropic.com>
+   EOF
+   )"
+   ```
+
+9. **Push and create PR** (automatic, no asking):
    ```bash
    git push -u origin pk/issue-{{ISSUE_NUMBER}}-<description>
 
@@ -59,11 +84,12 @@ You are working on GitHub issue #{{ISSUE_NUMBER}} for the therapy-clinic-nextjs 
      --label "ready-for-review"
    ```
 
-9. **Inform user**:
+10. **Inform user**:
    - Provide PR URL
    - Summarize what was done
    - Note any important decisions or trade-offs
    - List what to review carefully
+   - Confirm app verified and running
 
 ## Context Files to Reference
 
@@ -88,9 +114,20 @@ If the issue involves PHI (Protected Health Information):
 - [ ] Type errors fixed correctly (no workarounds)
 - [ ] `npm run check:types` passes
 
+## Git Commit Checklist
+
+- [ ] Use `git commit -s` for DCO sign-off (CRITICAL)
+- [ ] Follow conventional commits format
+- [ ] Include `Resolves #{{ISSUE_NUMBER}}`
+- [ ] Add co-author line
+- [ ] Add Claude Code footer
+- [ ] Use HEREDOC for multi-line commit messages
+
 ## Remember
 
 - **NEVER** compromise on type safety
 - **ALWAYS** follow HIPAA compliance patterns
 - **ALWAYS** use TodoWrite to track progress
 - **ALWAYS** test thoroughly before committing
+- **ALWAYS** verify app starts successfully after changes
+- **ALWAYS** use `-s` flag when committing (DCO compliance)

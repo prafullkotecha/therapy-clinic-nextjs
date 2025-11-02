@@ -34,30 +34,38 @@ Continue working on issue #{{ISSUE_NUMBER}} based on PR feedback.
    - Update tests if needed
    - Run quality checks
 
-6. **Commit changes**:
+6. **Verify application** (CRITICAL):
+   - Start dev server and verify it runs successfully
+   - See `/verify-app` command for details
+
+7. **Commit changes with DCO sign-off**:
    ```bash
    git add -A
-   git commit -m "fix: address PR feedback
+   git commit -s -m "$(cat <<'EOF'
+   fix: address PR feedback
 
    - [List changes made]
    - [Address specific comments]
 
    🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
-   Co-Authored-By: Claude <noreply@anthropic.com>"
+   Co-Authored-By: Claude <noreply@anthropic.com>
+   EOF
+   )"
    ```
+   **CRITICAL**: Always use `-s` flag for DCO compliance
 
-7. **Push updates** (automatic):
+8. **Push updates** (automatic):
    ```bash
    git push
    ```
 
-8. **Update PR** (if description changed):
+9. **Update PR** (if description changed):
    ```bash
    gh pr edit {{PR_NUMBER}} --body "Updated description..."
    ```
 
-9. **Request re-review**:
+10. **Request re-review**:
    ```bash
    gh pr ready {{PR_NUMBER}}
    ```
@@ -68,7 +76,9 @@ Before pushing:
 - [ ] `npm run check:types` passes
 - [ ] `npm run lint` passes
 - [ ] All tests pass
+- [ ] App verified and runs successfully
 - [ ] Addressed all PR comments
+- [ ] Commit uses `-s` flag (DCO sign-off)
 - [ ] No new HIPAA violations
 - [ ] No new TypeScript compromises
 
