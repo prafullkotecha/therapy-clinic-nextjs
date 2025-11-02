@@ -3,11 +3,17 @@
 // Appointment schemas
 export * from './appointment.schema';
 
+// Availability schemas
+export * from './availability.schema';
+
 // Client schemas
 export * from './client.schema';
 
 // Documentation schemas
 export * from './documentation.schema';
+
+// Session schemas
+export * from './session.schema';
 
 // Specialization schemas
 export * from './specialization.schema';
