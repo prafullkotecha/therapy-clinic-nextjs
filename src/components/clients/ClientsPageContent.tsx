@@ -33,7 +33,7 @@ type Client = {
   createdAt: string;
 };
 
-export default function ClientsPage() {
+export function ClientsPageContent() {
   const [clients, setClients] = useState<Client[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
