@@ -59,3 +59,38 @@ export const auditLogs = pgTable('audit_logs', {
     phiAccessedIdx: index('audit_logs_phi_accessed_idx').on(table.phiAccessed),
   };
 });
+
+// Failed login attempts table - Tracks failed authentication attempts for security
+// Used for account lockout and brute force detection
+export const failedLoginAttempts = pgTable('failed_login_attempts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+
+  // Identifier - can be email, keycloakId, or username
+  identifier: varchar('identifier', { length: 255 }).notNull(),
+  identifierType: varchar('identifier_type', { length: 50 }).notNull(),
+  // email, keycloak_id, username
+
+  // Request details
+  ipAddress: varchar('ip_address', { length: 45 }).notNull(),
+  userAgent: text('user_agent'),
+
+  // Attempt details
+  attemptedAt: timestamp('attempted_at').defaultNow().notNull(),
+  failureReason: varchar('failure_reason', { length: 100 }),
+  // invalid_credentials, account_locked, account_disabled, mfa_failed
+
+  // Cleanup tracking
+  expiresAt: timestamp('expires_at').notNull(),
+  // Auto-expire after configured period (e.g., 15 minutes)
+}, (table) => {
+  return {
+    tenantIdIdx: index('failed_login_attempts_tenant_id_idx').on(table.tenantId),
+    identifierIdx: index('failed_login_attempts_identifier_idx').on(table.identifier),
+    ipAddressIdx: index('failed_login_attempts_ip_address_idx').on(table.ipAddress),
+    attemptedAtIdx: index('failed_login_attempts_attempted_at_idx').on(table.attemptedAt),
+    expiresAtIdx: index('failed_login_attempts_expires_at_idx').on(table.expiresAt),
+    // Composite index for common query pattern: check recent attempts by identifier
+    identifierTimeIdx: index('failed_login_attempts_identifier_time_idx').on(table.identifier, table.attemptedAt),
+  };
+});
