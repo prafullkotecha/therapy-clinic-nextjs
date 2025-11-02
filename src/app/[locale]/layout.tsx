@@ -3,6 +3,7 @@ import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { PostHogProvider } from '@/components/analytics/PostHogProvider';
+import { AuthProvider } from '@/components/providers/AuthProvider';
 import { routing } from '@/libs/I18nRouting';
 import '@/styles/global.css';
 
@@ -50,11 +51,13 @@ export default async function RootLayout(props: {
   return (
     <html lang={locale}>
       <body>
-        <NextIntlClientProvider>
-          <PostHogProvider>
-            {props.children}
-          </PostHogProvider>
-        </NextIntlClientProvider>
+        <AuthProvider>
+          <NextIntlClientProvider>
+            <PostHogProvider>
+              {props.children}
+            </PostHogProvider>
+          </NextIntlClientProvider>
+        </AuthProvider>
       </body>
     </html>
   );
