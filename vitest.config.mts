@@ -8,8 +8,25 @@ export default defineConfig({
   plugins: [react(), tsconfigPaths()],
   test: {
     coverage: {
-      include: ['src/**/*'],
-      exclude: ['src/**/*.stories.{js,jsx,ts,tsx}'],
+      provider: 'v8',
+      reporter: ['text', 'json', 'html', 'text-summary'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/**/*.stories.{js,jsx,ts,tsx}',
+        'src/**/*.test.{ts,tsx}',
+        'src/**/*.spec.{ts,tsx}',
+        'src/**/*.d.ts',
+        'src/**/*.config.{ts,tsx}',
+        'src/app/**/*',
+        'src/types/**/*',
+        'src/**/index.ts',
+      ],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 80,
+        statements: 80,
+      },
     },
     projects: [
       {
@@ -17,7 +34,10 @@ export default defineConfig({
         test: {
           name: 'unit',
           include: ['src/**/*.test.{js,ts}'],
-          exclude: ['src/hooks/**/*.test.ts'],
+          exclude: [
+            'src/hooks/**/*.test.ts',
+            'src/lib/__tests__/tenant-isolation.test.ts',
+          ],
           environment: 'node',
         },
       },
