@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import NextAuth from 'next-auth';
 import Keycloak from 'next-auth/providers/keycloak';
+import { getAuthRequestContext } from '@/lib/auth-context';
 import { db } from '@/libs/DB';
 import { users } from '@/models/user.schema';
 import { logLoginSuccess } from '@/services/audit.service';
@@ -47,14 +48,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               // Clear any failed login attempts on successful login
               await clearFailedAttempts(tenantId, dbUser.email);
 
-              // Log the login event
-              // Note: We don't have access to request headers here
-              // This will be enhanced when we have middleware that can capture request context
+              // Get request context from middleware cookies
+              const { ipAddress, userAgent } = await getAuthRequestContext();
+
+              // Log the login event with real IP and user agent
               await logLoginSuccess(
                 tenantId,
                 dbUser.id,
-                'unavailable', // IP will be captured in middleware/route handler
-                'unavailable', // User agent will be captured in middleware/route handler
+                ipAddress,
+                userAgent,
               );
             }
           }
@@ -122,12 +124,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
           if (dbUser) {
             const { logLogout } = await import('@/services/audit.service');
-            // Note: We don't have access to request headers here
+
+            // Get request context from middleware cookies
+            const { ipAddress, userAgent } = await getAuthRequestContext();
+
+            // Log logout event with real IP and user agent
             await logLogout(
               tenantId,
               dbUser.id,
-              'unavailable', // IP will be captured in middleware/route handler
-              'unavailable', // User agent will be captured in middleware/route handler
+              ipAddress,
+              userAgent,
             );
           }
         }
