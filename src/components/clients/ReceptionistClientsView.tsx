@@ -1,28 +1,13 @@
 'use client';
 
-import type { CreateClientInput, UpdateClientInput } from '@/validations/client.validation';
 import { useEffect, useState } from 'react';
-import { ClientProfileForm } from '@/components/clients/ClientProfileForm';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
-
-type Location = {
-  id: string;
-  name: string;
-};
-
-type Specialization = {
-  id: string;
-  name: string;
-  category: string;
-  description: string | null;
-};
 
 type Client = {
   id: string;
   firstName: string;
   lastName: string;
-  dateOfBirth: string;
   email: string | null;
   phone: string | null;
   ageGroup: string | null;
@@ -30,24 +15,24 @@ type Client = {
   primaryLocationId: string | null;
   assignedTherapistId: string | null;
   intakeDate: string | null;
-  createdAt: string;
 };
 
-export function ClientsPageContent() {
+/**
+ * Receptionist view for client management
+ * Read/update access to all clients, focus on contact info and scheduling
+ */
+export function ReceptionistClientsView() {
   const [clients, setClients] = useState<Client[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchClients = async (): Promise<void> => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetch('/api/admin/clients');
+      // Fetch all clients with receptionist-relevant fields
+      const response = await fetch('/api/admin/clients?role=receptionist');
       if (!response.ok) {
         throw new Error('Failed to fetch clients');
       }
@@ -60,105 +45,16 @@ export function ClientsPageContent() {
     }
   };
 
-  const fetchReferenceData = async (): Promise<void> => {
-    try {
-      const [locationsRes, specializationsRes] = await Promise.all([
-        fetch('/api/tenants/locations'),
-        fetch('/api/admin/specializations'),
-      ]);
-
-      if (locationsRes.ok) {
-        const locationsData = await locationsRes.json();
-        setLocations(locationsData);
-      }
-      if (specializationsRes.ok) {
-        const specializationsData = await specializationsRes.json();
-        setSpecializations(specializationsData.filter((s: Specialization) => s.description !== null));
-      }
-    } catch (err) {
-      console.error('Failed to fetch reference data:', err);
-    }
-  };
-
-  const handleCreate = async (data: CreateClientInput): Promise<void> => {
-    const response = await fetch('/api/admin/clients', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create client');
-    }
-
-    await fetchClients();
-    setIsModalOpen(false);
-  };
-
-  const handleUpdate = async (data: UpdateClientInput): Promise<void> => {
-    if (!editingClient) {
-      return;
-    }
-
-    const response = await fetch(`/api/admin/clients/${editingClient.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to update client');
-    }
-
-    await fetchClients();
-    setIsModalOpen(false);
-    setEditingClient(null);
-  };
-
-  const handleDelete = async (id: string): Promise<void> => {
-    // eslint-disable-next-line no-alert
-    if (!window.confirm('Are you sure you want to delete this client profile?')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/admin/clients/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete client');
-      }
-
-      await fetchClients();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    }
-  };
-
-  const openCreateModal = (): void => {
-    setEditingClient(null);
-    setIsModalOpen(true);
-  };
-
-  const openEditModal = (client: Client): void => {
-    setEditingClient(client);
-    setIsModalOpen(true);
-  };
-
   useEffect(() => {
     fetchClients();
-    fetchReferenceData();
   }, []);
 
   const filteredClients = clients.filter((client) => {
     const searchLower = searchTerm.toLowerCase();
     const fullName = `${client.firstName} ${client.lastName}`.toLowerCase();
     const email = client.email?.toLowerCase() || '';
-    return fullName.includes(searchLower) || email.includes(searchLower);
+    const phone = client.phone || '';
+    return fullName.includes(searchLower) || email.includes(searchLower) || phone.includes(searchLower);
   });
 
   const getAgeGroupLabel = (ageGroup: string | null): string => {
@@ -187,8 +83,16 @@ export function ClientsPageContent() {
   return (
     <div className="container mx-auto p-8">
       <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Client Management</h1>
-        <Button onClick={openCreateModal}>
+        <div>
+          <h1 className="text-3xl font-bold">Client Directory</h1>
+          <p className="mt-2 text-gray-600">Manage client contact information and scheduling</p>
+        </div>
+        <Button onClick={() => {
+          // TODO: Implement add client functionality
+          // eslint-disable-next-line no-alert
+          alert('Add client functionality coming soon');
+        }}
+        >
           Add Client
         </Button>
       </div>
@@ -208,7 +112,7 @@ export function ClientsPageContent() {
             <input
               id="search"
               type="text"
-              placeholder="Search by name or email..."
+              placeholder="Search by name, email, or phone..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-4 py-2"
@@ -267,21 +171,34 @@ export function ClientsPageContent() {
                           {new Date(client.intakeDate).toLocaleDateString()}
                         </p>
                       )}
+                      <p>
+                        <span className="font-medium">Therapist:</span>
+                        {' '}
+                        {client.assignedTherapistId ? 'Assigned' : 'Not yet assigned'}
+                      </p>
                     </div>
                     <div className="flex gap-2">
                       <Button
                         size="sm"
                         variant="secondary"
-                        onClick={() => openEditModal(client)}
+                        onClick={() => {
+                          // TODO: Implement edit contact info
+                          // eslint-disable-next-line no-alert
+                          alert('Edit contact functionality coming soon');
+                        }}
                       >
-                        Edit
+                        Edit Contact
                       </Button>
                       <Button
                         size="sm"
-                        variant="danger"
-                        onClick={() => handleDelete(client.id)}
+                        variant="primary"
+                        onClick={() => {
+                          // TODO: Implement schedule appointment
+                          // eslint-disable-next-line no-alert
+                          alert('Schedule appointment functionality coming soon');
+                        }}
                       >
-                        Delete
+                        Schedule
                       </Button>
                     </div>
                   </CardBody>
@@ -292,42 +209,7 @@ export function ClientsPageContent() {
 
       {filteredClients.length === 0 && !isLoading && (
         <div className="py-8 text-center text-gray-500">
-          No clients found
-        </div>
-      )}
-
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white p-6">
-            <h2 className="mb-6 text-2xl font-bold">
-              {editingClient ? 'Edit Client Profile' : 'Create Client Profile'}
-            </h2>
-            <ClientProfileForm
-              locations={locations}
-              specializations={specializations}
-              onSubmit={editingClient
-                ? data => handleUpdate(data as UpdateClientInput)
-                : data => handleCreate(data as CreateClientInput)}
-              onCancel={() => {
-                setIsModalOpen(false);
-                setEditingClient(null);
-              }}
-              initialData={editingClient
-                ? {
-                    firstName: editingClient.firstName,
-                    lastName: editingClient.lastName,
-                    dateOfBirth: editingClient.dateOfBirth,
-                    email: editingClient.email || undefined,
-                    phone: editingClient.phone || undefined,
-                    ageGroup: editingClient.ageGroup as any,
-                    status: editingClient.status as any,
-                    primaryLocationId: editingClient.primaryLocationId || undefined,
-                    intakeDate: editingClient.intakeDate || undefined,
-                  }
-                : undefined}
-              isEditing={!!editingClient}
-            />
-          </div>
+          {searchTerm ? 'No clients found matching your search' : 'No clients found'}
         </div>
       )}
     </div>

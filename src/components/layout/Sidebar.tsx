@@ -29,7 +29,7 @@ const navigationConfig = {
   [UserRoles.ADMIN]: [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
     { name: 'Specializations', href: '/admin/specializations', icon: AcademicCapIcon, resource: 'therapists' },
-    { name: 'Therapists', href: '/admin/therapists', icon: UserGroupIcon, resource: 'therapists' },
+    { name: 'Therapists', href: '/therapists', icon: UserGroupIcon, resource: 'therapists' },
     { name: 'Clients', href: '/clients', icon: UsersIcon, resource: 'clients' },
     { name: 'Appointments', href: '/admin/appointments', icon: CalendarIcon, resource: 'appointments' },
     { name: 'Billing', href: '/admin/billing', icon: CreditCardIcon, resource: 'billing' },
@@ -40,6 +40,7 @@ const navigationConfig = {
   [UserRoles.THERAPIST]: [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
     { name: 'My Clients', href: '/clients', icon: UsersIcon, resource: 'clients' },
+    { name: 'Therapists', href: '/therapists', icon: UserGroupIcon, resource: 'therapists' },
     { name: 'My Appointments', href: '/dashboard/appointments', icon: CalendarIcon, resource: 'appointments' },
     { name: 'Documentation', href: '/dashboard/documentation', icon: DocumentTextIcon },
     { name: 'Reports', href: '/dashboard/reports', icon: ChartBarIcon, resource: 'reports' },
@@ -54,7 +55,7 @@ const navigationConfig = {
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
     { name: 'Clients', href: '/clients', icon: UsersIcon, resource: 'clients' },
     { name: 'Appointments', href: '/dashboard/appointments', icon: CalendarIcon, resource: 'appointments' },
-    { name: 'Therapists', href: '/dashboard/therapists', icon: UsersIcon, resource: 'therapists' },
+    { name: 'Therapists', href: '/therapists', icon: UserGroupIcon, resource: 'therapists' },
   ],
 };
 
