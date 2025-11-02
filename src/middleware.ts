@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { detectBot } from '@arcjet/next';
 import createMiddleware from 'next-intl/middleware';
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { autoProtectRoutes, requireAuth } from '@/lib/middleware';
 import arcjet from '@/libs/Arcjet';
 import { routing } from './libs/I18nRouting';
 
@@ -43,12 +43,16 @@ export default async function middleware(
 
   // Check authentication for protected routes
   if (isProtectedRoute(request.nextUrl.pathname)) {
-    const session = await auth();
+    // Basic authentication check
+    const authResponse = await requireAuth(request);
+    if (authResponse) {
+      return authResponse;
+    }
 
-    if (!session?.user) {
-      const locale = request.nextUrl.pathname.match(/(\/.*)\/dashboard/)?.at(1) ?? '';
-      const signInUrl = new URL(`${locale}/sign-in`, request.url);
-      return NextResponse.redirect(signInUrl);
+    // Role-based route protection (checks /dashboard/admin, /dashboard/therapist, etc.)
+    const roleResponse = await autoProtectRoutes(request);
+    if (roleResponse) {
+      return roleResponse;
     }
   }
 
