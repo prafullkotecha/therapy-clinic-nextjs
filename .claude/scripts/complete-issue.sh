@@ -6,7 +6,7 @@ set -e
 
 ISSUE_NUMBER=$1
 PR_NUMBER=$2
-PROJECT_ID=1
+PROJECT_NUMBER=1
 OWNER=prafullkotecha
 REPO=therapy-clinic-nextjs
 
@@ -17,6 +17,9 @@ if [ -z "$ISSUE_NUMBER" ]; then
 fi
 
 echo "🔍 Completing issue #$ISSUE_NUMBER..."
+
+# Get the actual project ID (GraphQL format, not just the number)
+PROJECT_ID=$(gh project list --owner "$OWNER" --format json | jq -r '.projects[] | select(.number == 1) | .id')
 
 # Auto-detect PR number if not provided
 if [ -z "$PR_NUMBER" ]; then
@@ -74,8 +77,8 @@ echo "✅ PR merged and remote branch deleted"
 # Update project board
 echo "📊 Updating project board..."
 
-# Get project item ID
-ITEM_ID=$(gh project item-list "$PROJECT_ID" --owner "$OWNER" --format json | \
+# Get project item ID (use project number for list commands)
+ITEM_ID=$(gh project item-list "$PROJECT_NUMBER" --owner "$OWNER" --format json | \
   jq -r ".items[] | select(.content.number == $ISSUE_NUMBER) | .id")
 
 if [ -z "$ITEM_ID" ]; then
@@ -83,21 +86,21 @@ if [ -z "$ITEM_ID" ]; then
 else
   echo "✅ Found project item: $ITEM_ID"
 
-  # Get Status field ID
-  STATUS_FIELD_ID=$(gh project field-list "$PROJECT_ID" --owner "$OWNER" --format json | \
+  # Get Status field ID (use project number for field-list)
+  STATUS_FIELD_ID=$(gh project field-list "$PROJECT_NUMBER" --owner "$OWNER" --format json | \
     jq -r '.fields[] | select(.name == "Status") | .id')
 
   if [ -z "$STATUS_FIELD_ID" ]; then
     echo "⚠️  Could not find Status field ID"
   else
-    # Get "Done" option ID
-    DONE_OPTION_ID=$(gh project field-list "$PROJECT_ID" --owner "$OWNER" --format json | \
+    # Get "Done" option ID (use project number for field-list)
+    DONE_OPTION_ID=$(gh project field-list "$PROJECT_NUMBER" --owner "$OWNER" --format json | \
       jq -r '.fields[] | select(.name == "Status") | .options[] | select(.name == "✅ Done") | .id')
 
     if [ -z "$DONE_OPTION_ID" ]; then
       echo "⚠️  Could not find 'Done' option ID"
     else
-      # Update status
+      # Update status (use full project ID for item-edit)
       gh project item-edit --id "$ITEM_ID" --project-id "$PROJECT_ID" \
         --field-id "$STATUS_FIELD_ID" --single-select-option-id "$DONE_OPTION_ID"
 
