@@ -3,7 +3,9 @@ import { NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth-helpers';
 import {
   createClient,
+  filterClientFieldsByRole,
   listClients,
+  listClientsForTherapist,
 } from '@/services/client.service';
 import {
   clientQuerySchema,
@@ -12,11 +14,11 @@ import {
 
 /**
  * GET /api/admin/clients
- * List all clients with optional filtering
+ * List all clients with optional filtering and role-based field filtering
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
-    const { tenantId, userId, hasPermission, isAuthenticated } = await getAuthContext();
+    const { tenantId, userId, userRole, hasPermission, isAuthenticated } = await getAuthContext();
 
     if (!isAuthenticated || !tenantId || !userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -29,6 +31,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Parse query parameters
     const { searchParams } = new URL(request.url);
     const queryParams = Object.fromEntries(searchParams);
+    const roleParam = searchParams.get('role') || userRole;
+    const userIdParam = searchParams.get('userId') || userId;
+
     const validatedQuery = clientQuerySchema.safeParse(queryParams);
 
     if (!validatedQuery.success) {
@@ -38,9 +43,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const clientsList = await listClients(tenantId, userId, validatedQuery.data);
+    // Fetch clients based on role
+    let clientsList;
+    if (roleParam === 'therapist') {
+      // Therapists only see their assigned clients
+      clientsList = await listClientsForTherapist(tenantId, userIdParam, userId);
+    } else {
+      // All other roles see all clients (filtered by fields below)
+      clientsList = await listClients(tenantId, userId, validatedQuery.data);
+    }
 
-    return NextResponse.json(clientsList);
+    // Filter fields based on role
+    const filteredClients = clientsList.map(client =>
+      filterClientFieldsByRole(client, roleParam),
+    );
+
+    return NextResponse.json(filteredClients);
   } catch (error) {
     console.error('Error fetching clients:', error);
     return NextResponse.json(

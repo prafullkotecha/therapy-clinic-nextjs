@@ -610,6 +610,116 @@ function decryptClient(encryptedClient: any): ClientWithDetails {
 }
 
 /**
+ * List clients for a specific therapist (only their assigned clients)
+ */
+export async function listClientsForTherapist(
+  tenantId: string,
+  therapistId: string,
+  userId: string,
+): Promise<ClientWithDetails[]> {
+  return await withTenantContext(tenantId, async () => {
+    // Find therapist record by userId
+    const [therapist] = await db
+      .select()
+      .from(therapists)
+      .where(and(eq(therapists.userId, therapistId), eq(therapists.tenantId, tenantId)))
+      .limit(1);
+
+    if (!therapist) {
+      throw new Error('Therapist not found');
+    }
+
+    // Fetch only assigned clients
+    const clientsList = await db
+      .select()
+      .from(clients)
+      .where(and(
+        eq(clients.tenantId, tenantId),
+        eq(clients.assignedTherapistId, therapist.id),
+      ))
+      .orderBy(sql`${clients.createdAt} DESC`);
+
+    // Log PHI access
+    await logAudit(tenantId, {
+      userId,
+      action: 'read',
+      resource: 'clients',
+      phiAccessed: true,
+      metadata: {
+        count: clientsList.length,
+        therapistId: therapist.id,
+      },
+    });
+
+    // Decrypt all clients
+    return clientsList.map(client => decryptClient(client));
+  });
+}
+
+/**
+ * Filter client fields based on user role
+ * Removes sensitive fields that the role should not see
+ */
+export function filterClientFieldsByRole(client: ClientWithDetails, role: string): Partial<ClientWithDetails> {
+  const baseFields = {
+    id: client.id,
+    firstName: client.firstName,
+    lastName: client.lastName,
+    email: client.email,
+    phone: client.phone,
+    status: client.status,
+  };
+
+  switch (role) {
+    case 'therapist':
+      // Therapist: clinical focus, no insurance or SSN
+      return {
+        ...baseFields,
+        dateOfBirth: client.dateOfBirth,
+        ageGroup: client.ageGroup,
+        preferredLanguage: client.preferredLanguage,
+        guardianName: client.guardianName,
+        guardianRelationship: client.guardianRelationship,
+        guardianPhone: client.guardianPhone,
+        guardianEmail: client.guardianEmail,
+        emergencyContactName: client.emergencyContactName,
+        emergencyContactPhone: client.emergencyContactPhone,
+        emergencyContactRelationship: client.emergencyContactRelationship,
+        intakeDate: client.intakeDate,
+        assignedTherapistId: client.assignedTherapistId,
+        therapist: client.therapist,
+        needs: client.needs,
+      };
+
+    case 'billing':
+      // Billing: insurance focus, limited clinical info
+      return {
+        ...baseFields,
+        insuranceProvider: client.insuranceProvider,
+        insurancePolicyNumber: client.insurancePolicyNumber,
+        insuranceGroupNumber: client.insuranceGroupNumber,
+        assignedTherapistId: client.assignedTherapistId,
+      };
+
+    case 'receptionist':
+      // Receptionist: contact and scheduling focus
+      return {
+        ...baseFields,
+        ageGroup: client.ageGroup,
+        preferredLanguage: client.preferredLanguage,
+        primaryLocationId: client.primaryLocationId,
+        assignedTherapistId: client.assignedTherapistId,
+        intakeDate: client.intakeDate,
+      };
+
+    case 'admin':
+    default:
+      // Admin: full access
+      return client;
+  }
+}
+
+/**
  * Helper: Decrypt client needs PHI fields
  */
 function decryptClientNeeds(encryptedNeeds: any): ClientNeedsWithDetails {
