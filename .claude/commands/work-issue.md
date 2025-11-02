@@ -91,6 +91,10 @@ You are working on GitHub issue #{{ISSUE_NUMBER}} for the therapy-clinic-nextjs 
    - List what to review carefully
    - Confirm app verified and running
 
+**Note:** Do NOT suggest next issue here. That's handled by:
+- `/suggest-next-issue` - Standalone command for issue recommendation
+- `/complete-issue` - Automatically suggests next after merging PR
+
 ## Context Files to Reference
 
 - **CLAUDE.md** - TypeScript best practices, architecture, patterns
