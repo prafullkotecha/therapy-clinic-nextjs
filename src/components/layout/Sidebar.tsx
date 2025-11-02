@@ -2,12 +2,14 @@
 
 import type { UserRole } from '@/lib/rbac';
 import {
+  AcademicCapIcon,
   CalendarIcon,
   ChartBarIcon,
   Cog6ToothIcon,
   CreditCardIcon,
   DocumentTextIcon,
   HomeIcon,
+  UserGroupIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
 import { clsx } from 'clsx';
@@ -26,13 +28,14 @@ type SidebarProps = {
 const navigationConfig = {
   [UserRoles.ADMIN]: [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-    { name: 'Clients', href: '/dashboard/clients', icon: UsersIcon, resource: 'clients' },
-    { name: 'Therapists', href: '/dashboard/therapists', icon: UsersIcon, resource: 'therapists' },
-    { name: 'Appointments', href: '/dashboard/appointments', icon: CalendarIcon, resource: 'appointments' },
-    { name: 'Billing', href: '/dashboard/billing', icon: CreditCardIcon, resource: 'billing' },
-    { name: 'Reports', href: '/dashboard/reports', icon: ChartBarIcon, resource: 'reports' },
-    { name: 'Users', href: '/dashboard/users', icon: Cog6ToothIcon, resource: 'users' },
-    { name: 'Audit Logs', href: '/dashboard/audit', icon: DocumentTextIcon, resource: 'audit_logs' },
+    { name: 'Specializations', href: '/admin/specializations', icon: AcademicCapIcon, resource: 'therapists' },
+    { name: 'Therapists', href: '/admin/therapists', icon: UserGroupIcon, resource: 'therapists' },
+    { name: 'Clients', href: '/admin/clients', icon: UsersIcon, resource: 'clients' },
+    { name: 'Appointments', href: '/admin/appointments', icon: CalendarIcon, resource: 'appointments' },
+    { name: 'Billing', href: '/admin/billing', icon: CreditCardIcon, resource: 'billing' },
+    { name: 'Reports', href: '/admin/reports', icon: ChartBarIcon, resource: 'reports' },
+    { name: 'Users', href: '/admin/users', icon: Cog6ToothIcon, resource: 'users' },
+    { name: 'Audit Logs', href: '/admin/audit', icon: DocumentTextIcon, resource: 'audit_logs' },
   ],
   [UserRoles.THERAPIST]: [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
