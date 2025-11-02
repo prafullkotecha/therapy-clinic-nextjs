@@ -1,5 +1,9 @@
+import { eq } from 'drizzle-orm';
 import NextAuth from 'next-auth';
 import Keycloak from 'next-auth/providers/keycloak';
+import { db } from '@/libs/DB';
+import { users } from '@/models/user.schema';
+import { logLoginSuccess } from '@/services/audit.service';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -10,6 +14,47 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
+    async signIn({ user, account, profile }) {
+      // Log successful login to audit logs
+      try {
+        if (account && profile) {
+          const tenantId = (profile as any).tenant_id as string | undefined;
+          const keycloakId = user.id;
+
+          if (tenantId && keycloakId) {
+            // Find user in our database
+            const [dbUser] = await db
+              .select()
+              .from(users)
+              .where(eq(users.keycloakId, keycloakId))
+              .limit(1);
+
+            if (dbUser) {
+              // Update last login timestamp
+              await db
+                .update(users)
+                .set({ lastLoginAt: new Date() })
+                .where(eq(users.id, dbUser.id));
+
+              // Log the login event
+              // Note: We don't have access to request headers here
+              // This will be enhanced when we have middleware that can capture request context
+              await logLoginSuccess(
+                tenantId,
+                dbUser.id,
+                'unavailable', // IP will be captured in middleware/route handler
+                'unavailable', // User agent will be captured in middleware/route handler
+              );
+            }
+          }
+        }
+      } catch (error) {
+        // Log error but don't prevent login
+        console.error('Failed to log auth event:', error);
+      }
+
+      return true;
+    },
     async jwt({ token, account, profile }) {
       // Persist additional user info in the JWT
       if (account && profile) {
@@ -41,5 +86,44 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: {
     strategy: 'jwt',
     maxAge: 15 * 60, // 15 minutes (HIPAA compliance)
+  },
+  events: {
+    async signOut(message) {
+      // Log logout event
+      try {
+        // NextAuth v5 signOut event provides either session or token
+        const token = 'token' in message ? message.token : null;
+
+        if (!token) {
+          return;
+        }
+
+        const tenantId = token?.tenantId as string | undefined;
+        const keycloakId = token?.sub as string | undefined;
+
+        if (tenantId && keycloakId) {
+          // Find user in our database
+          const [dbUser] = await db
+            .select()
+            .from(users)
+            .where(eq(users.keycloakId, keycloakId))
+            .limit(1);
+
+          if (dbUser) {
+            const { logLogout } = await import('@/services/audit.service');
+            // Note: We don't have access to request headers here
+            await logLogout(
+              tenantId,
+              dbUser.id,
+              'unavailable', // IP will be captured in middleware/route handler
+              'unavailable', // User agent will be captured in middleware/route handler
+            );
+          }
+        }
+      } catch (error) {
+        // Log error but don't prevent logout
+        console.error('Failed to log logout event:', error);
+      }
+    },
   },
 });
