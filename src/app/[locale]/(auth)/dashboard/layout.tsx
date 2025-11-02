@@ -1,8 +1,11 @@
-import { getTranslations, setRequestLocale } from 'next-intl/server';
-import Link from 'next/link';
-import { LocaleSwitcher } from '@/components/LocaleSwitcher';
-import { signOut } from '@/lib/auth';
-import { BaseTemplate } from '@/templates/BaseTemplate';
+import type { UserRole } from '@/lib/rbac';
+import { setRequestLocale } from 'next-intl/server';
+import { redirect } from 'next/navigation';
+import { DashboardShell } from '@/components/layout/DashboardShell';
+import { auth } from '@/lib/auth';
+import { UserRoles } from '@/lib/rbac';
+
+export const dynamic = 'force-dynamic';
 
 export default async function DashboardLayout(props: {
   children: React.ReactNode;
@@ -10,55 +13,25 @@ export default async function DashboardLayout(props: {
 }) {
   const { locale } = await props.params;
   setRequestLocale(locale);
-  const t = await getTranslations({
-    locale,
-    namespace: 'DashboardLayout',
-  });
+
+  // Check authentication
+  const session = await auth();
+  if (!session?.user) {
+    redirect(`/${locale}/sign-in`);
+  }
+
+  // Extract user role from session (assumes Keycloak JWT contains roles)
+  const userRole = (session.user.roles?.[0] || UserRoles.THERAPIST) as UserRole;
+  const userName = session.user.name || 'User';
+  const userEmail = session.user.email || '';
 
   return (
-    <BaseTemplate
-      leftNav={(
-        <>
-          <li>
-            <Link
-              href="/dashboard/"
-              className="border-none text-gray-700 hover:text-gray-900"
-            >
-              {t('dashboard_link')}
-            </Link>
-          </li>
-          <li>
-            <Link
-              href="/dashboard/user-profile/"
-              className="border-none text-gray-700 hover:text-gray-900"
-            >
-              {t('user_profile_link')}
-            </Link>
-          </li>
-        </>
-      )}
-      rightNav={(
-        <>
-          <li>
-            <form
-              action={async () => {
-                'use server';
-                await signOut();
-              }}
-            >
-              <button className="border-none text-gray-700 hover:text-gray-900" type="submit">
-                {t('sign_out')}
-              </button>
-            </form>
-          </li>
-
-          <li>
-            <LocaleSwitcher />
-          </li>
-        </>
-      )}
+    <DashboardShell
+      userRole={userRole}
+      userName={userName}
+      userEmail={userEmail}
     >
       {props.children}
-    </BaseTemplate>
+    </DashboardShell>
   );
 }

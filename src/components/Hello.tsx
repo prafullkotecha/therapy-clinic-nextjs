@@ -1,30 +1,16 @@
 import { getTranslations } from 'next-intl/server';
 import { auth } from '@/lib/auth';
-import { Sponsors } from './Sponsors';
 
 export const Hello = async () => {
   const t = await getTranslations('Dashboard');
   const session = await auth();
 
   return (
-    <>
-      <p>
+    <div>
+      <p className="text-lg">
         {`👋 `}
         {t('hello_message', { email: session?.user?.email ?? '' })}
       </p>
-      <p>
-        {t.rich('alternative_message', {
-          url: () => (
-            <a
-              className="text-blue-700 hover:border-b-2 hover:border-blue-700"
-              href="https://github.com/prafullkotecha/therapy-clinic-nextjs"
-            >
-              Therapy Clinic System
-            </a>
-          ),
-        })}
-      </p>
-      <Sponsors />
-    </>
+    </div>
   );
 };
