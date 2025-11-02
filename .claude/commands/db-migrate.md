@@ -38,11 +38,33 @@ Generate Drizzle migrations and apply them safely.
    - Data migration scripts if needed
    - Rollback procedure
 
-6. **Commit migration**:
+6. **Verify application** (CRITICAL):
    ```bash
-   git add migrations/
-   git commit -m "chore: add migration for [description]"
+   # Start dev server
+   npm run dev
+
+   # Verify app starts and responds
+   curl http://localhost:3000
    ```
+   - App must start successfully after migration
+   - See `/verify-app` for full verification steps
+
+7. **Commit migration with DCO sign-off**:
+   ```bash
+   git add migrations/ src/models/
+   git commit -s -m "$(cat <<'EOF'
+   chore: add migration for [description]
+
+   - [Detail what changed in schema]
+   - [Note any breaking changes]
+
+   🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+   Co-Authored-By: Claude <noreply@anthropic.com>
+   EOF
+   )"
+   ```
+   **CRITICAL**: Always use `-s` flag for DCO compliance
 
 ## RLS Policy Template
 
@@ -67,4 +89,6 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON table_name TO authenticated_user;
 - [ ] Foreign keys have indexes
 - [ ] RLS policies on PHI tables
 - [ ] Migration tested locally
+- [ ] App verified and starts successfully
+- [ ] Commit uses `-s` flag (DCO sign-off)
 - [ ] Rollback procedure documented
