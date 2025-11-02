@@ -60,3 +60,7 @@ build-archive.log
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# Worktrees (parallel workflow system)
+/worktrees/
+.worktree-assignments.json

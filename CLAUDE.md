@@ -596,3 +596,229 @@ See `infrastructure/terraform/` for AWS infrastructure as code.
 - **GitHub Issues:** Track bugs and features
 - **Project Board:** See GitHub Projects for sprint planning
 - **Architecture Questions:** Refer to IMPLEMENTATION_PLAN.md Section 2-3
+
+## Worktree Awareness (Optional)
+
+**Parallel Workflow System:** This project supports running multiple Claude Code sessions in parallel using git worktrees.
+
+### Detection
+
+Check for `.worktree-config.json` at project root:
+- **If found** → You're in a worktree (parallel workflow mode)
+- **If not found** → Standard single-session workflow (no changes)
+
+### Worktree Configuration
+
+When `.worktree-config.json` exists, read it to understand context:
+
+```json
+{
+  "name": "dev-1",
+  "role": "development",
+  "port": 3001,
+  "guidelines": {
+    "purpose": "Feature development worktree #1",
+    "devServer": "Always use port 3001",
+    "testing": "Run quick checks only, delegate heavy tests to ci-cd",
+    "branches": "Create feature branches normally"
+  }
+}
+```
+
+### Behavioral Adjustments
+
+**When in a worktree, make these passive adjustments:**
+
+1. **Dev Server Port**
+   - Read PORT from `.env.local` file
+   - Use this port for `npm run dev` instead of default 3000
+   - Example: `[dev-1]` uses port 3001, `[dev-2]` uses port 3002
+
+2. **Response Prefixes**
+   - Prefix responses with worktree name: `[dev-1] Working on issue #42...`
+   - Helps user track which session is speaking
+
+3. **Testing Strategy**
+   - **Development worktrees (dev-1, dev-2)**: Quick checks only
+     - Run type checks before commits
+     - Suggest ci-cd worktree for full test suites
+     - Example: "For comprehensive testing, use ci-cd worktree (or run here if preferred)"
+   - **PR Review worktree (pr-review)**: Light testing only
+     - Focus on reviewing changes
+     - Test functionality if needed for review
+   - **CI/CD worktree (ci-cd)**: Comprehensive testing
+     - Run full test suites with coverage
+     - Handle database migrations
+     - Generate coverage reports
+
+4. **Role Guidelines**
+   - Read `guidelines` from config
+   - Follow role-specific recommendations
+   - Maintain awareness of worktree purpose
+
+### Worktree Coordination (Preventing Duplicate Work)
+
+**Issue Assignment Tracking:** To prevent multiple worktrees from working on the same issue, the system tracks assignments in `.worktree-assignments.json`.
+
+**Before starting work on an issue (`/work-issue N`):**
+
+1. **Check if issue is already assigned:**
+   ```bash
+   ASSIGNED_TO=$(./.claude/scripts/worktree-check-assignment.sh N)
+   if [ $? -eq 1 ]; then
+     # Issue is assigned to $ASSIGNED_TO
+     echo "Warning: Issue #N is already being worked on in $ASSIGNED_TO"
+     # Ask user if they want to continue anyway
+   fi
+   ```
+
+2. **If not assigned, assign to current worktree:**
+   ```bash
+   # Get current worktree name from .worktree-config.json
+   WORKTREE_NAME=$(jq -r '.name' .worktree-config.json)
+   ./.claude/scripts/worktree-assign.sh $WORKTREE_NAME N
+   ```
+
+3. **Proceed with normal `/work-issue` workflow**
+
+**Example interaction:**
+```
+User: /work-issue 42
+Claude: [dev-1] Checking if issue #42 is already assigned...
+Claude: [dev-1] ⚠️  Issue #42 is already being worked on in dev-2
+Claude: [dev-1]
+Claude: [dev-1] Options:
+Claude: [dev-1] 1. Work on a different issue (recommended)
+Claude: [dev-1] 2. Continue anyway (will cause git conflicts)
+Claude: [dev-1]
+Claude: [dev-1] Would you like me to suggest a different issue?
+```
+
+**After completing an issue (`/complete-issue N`):**
+
+1. **Unassign issue from current worktree:**
+   ```bash
+   WORKTREE_NAME=$(jq -r '.name' .worktree-config.json)
+   ./.claude/scripts/worktree-unassign.sh $WORKTREE_NAME N
+   ```
+
+2. **Check if other worktrees have the same branch checked out:**
+   ```bash
+   # Check git worktree list for the branch
+   BRANCH="pk/issue-N-description"
+   OTHER_WORKTREES=$(git worktree list | grep "$BRANCH" | grep -v "$(pwd)")
+
+   if [ -n "$OTHER_WORKTREES" ]; then
+     echo "⚠️  Branch $BRANCH is still checked out in other worktrees:"
+     echo "$OTHER_WORKTREES"
+     echo ""
+     echo "Those worktrees should be reset or switched to a different branch."
+   fi
+   ```
+
+3. **Proceed with normal `/complete-issue` workflow**
+
+**Checking assignments:**
+
+```bash
+# View all assignments
+cat .worktree-assignments.json
+
+# Or use the list script (shows assignments automatically)
+./.claude/scripts/worktree-list.sh
+```
+
+**Assignment file format:**
+```json
+{
+  "dev-1": 42,
+  "dev-2": 43,
+  "pr-review": null,
+  "ci-cd": null
+}
+```
+
+**Key behaviors:**
+- ✅ **Assignment is advisory** - Git will still prevent same branch checkout (hard protection)
+- ✅ **Check before starting work** - Warn user of conflicts
+- ✅ **Auto-cleanup on completion** - Remove assignment when issue done
+- ✅ **Safe failures** - If coordination fails, git branch protection still works
+
+### Commands Compatibility
+
+**ALL existing commands work identically in worktrees:**
+- `/work-issue N` - Creates branch, works normally
+- `/complete-issue N` - Merges PR, updates board
+- `/suggest-next-issue` - Analyzes, suggests next
+- `/review-pr N` - Reviews pull request
+- `/type-check` - Runs type checking
+- `/hipaa-check` - Runs HIPAA audit
+- `/verify-app` - Verifies app runs
+- `npm run dev` - Uses PORT from .env.local
+
+**No workflow changes needed.** Worktrees are a transparent enhancement.
+
+### Worktree Roles
+
+| Worktree | Port | Role | Purpose |
+|----------|------|------|---------|
+| dev-1 | 3001 | development | Feature development #1 |
+| dev-2 | 3002 | development | Feature development #2 |
+| pr-review | 3003 | pr-review | PR reviews without context switching |
+| ci-cd | 3004 | ci-cd | Tests, builds, CI operations |
+
+### Example Behavior
+
+**Main directory (no config):**
+```
+You: /work-issue 42
+Claude: Creating branch pk/issue-42-client-intake...
+Claude: Starting dev server on port 3000...
+```
+
+**In dev-1 worktree:**
+```
+You: /work-issue 42
+Claude: [dev-1] Creating branch pk/issue-42-client-intake...
+Claude: [dev-1] Starting dev server on port 3001...
+Claude: [dev-1] For full test suite, use ci-cd worktree
+```
+
+**In ci-cd worktree:**
+```
+You: Run full tests
+Claude: [ci-cd] Running comprehensive test suite...
+Claude: [ci-cd] ✓ Unit tests: 150 passed
+Claude: [ci-cd] ✓ Type check: No errors
+Claude: [ci-cd] ✓ Coverage: 85%
+```
+
+### Management
+
+**Setup** (one-time):
+```bash
+./.claude/scripts/worktree-init.sh
+```
+
+**Check status** (anytime):
+```bash
+/worktree-status
+# or
+./.claude/scripts/worktree-list.sh
+```
+
+**Documentation**:
+- Complete guide: `.claude/docs/WORKTREE_GUIDE.md`
+- Management scripts: `.claude/scripts/worktree-*.sh`
+
+### Key Points
+
+- ✅ Worktrees are **optional** - main workflow unchanged
+- ✅ Passive detection - no breaking changes
+- ✅ All commands work identically
+- ✅ Enables 4 parallel Claude sessions
+- ✅ Shared database, Redis, git repository
+- ✅ Independent node_modules, builds, dev servers
+- ✅ Easy to remove if not needed
+
+**If you're not in a worktree, ignore this entire section.** Everything works as before.
