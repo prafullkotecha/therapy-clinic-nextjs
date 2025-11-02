@@ -1,9 +1,8 @@
-import type { UserRole } from '@/lib/rbac';
 import { setRequestLocale } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 import { DashboardShell } from '@/components/layout/DashboardShell';
 import { auth } from '@/lib/auth';
-import { UserRoles } from '@/lib/rbac';
+import { extractPrimaryRole } from '@/lib/role-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +20,7 @@ export default async function DashboardLayout(props: {
   }
 
   // Extract user role from session (assumes Keycloak JWT contains roles)
-  const userRole = (session.user.roles?.[0] || UserRoles.THERAPIST) as UserRole;
+  const userRole = extractPrimaryRole(session.user.roles);
   const userName = session.user.name || 'User';
   const userEmail = session.user.email || '';
 
