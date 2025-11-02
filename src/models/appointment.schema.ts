@@ -35,7 +35,7 @@ export const appointments = pgTable('appointments', {
   // { frequency: 'weekly', interval: 1, daysOfWeek: [1, 3], endDate: '2025-12-31' }
   recurrencePattern: jsonb('recurrence_pattern'),
   // Self-referencing FK - references parent appointment in recurring series
-  parentAppointmentId: uuid('parent_appointment_id'),
+  parentAppointmentId: uuid('parent_appointment_id').references((): any => appointments.id),
 
   // Notifications
   reminderSent48h: boolean('reminder_sent_48h').default(false),
