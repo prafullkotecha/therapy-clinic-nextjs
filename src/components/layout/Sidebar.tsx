@@ -30,7 +30,7 @@ const navigationConfig = {
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
     { name: 'Specializations', href: '/admin/specializations', icon: AcademicCapIcon, resource: 'therapists' },
     { name: 'Therapists', href: '/admin/therapists', icon: UserGroupIcon, resource: 'therapists' },
-    { name: 'Clients', href: '/admin/clients', icon: UsersIcon, resource: 'clients' },
+    { name: 'Clients', href: '/clients', icon: UsersIcon, resource: 'clients' },
     { name: 'Appointments', href: '/admin/appointments', icon: CalendarIcon, resource: 'appointments' },
     { name: 'Billing', href: '/admin/billing', icon: CreditCardIcon, resource: 'billing' },
     { name: 'Reports', href: '/admin/reports', icon: ChartBarIcon, resource: 'reports' },
@@ -39,7 +39,7 @@ const navigationConfig = {
   ],
   [UserRoles.THERAPIST]: [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-    { name: 'My Clients', href: '/dashboard/clients', icon: UsersIcon, resource: 'clients' },
+    { name: 'My Clients', href: '/clients', icon: UsersIcon, resource: 'clients' },
     { name: 'My Appointments', href: '/dashboard/appointments', icon: CalendarIcon, resource: 'appointments' },
     { name: 'Documentation', href: '/dashboard/documentation', icon: DocumentTextIcon },
     { name: 'Reports', href: '/dashboard/reports', icon: ChartBarIcon, resource: 'reports' },
@@ -47,12 +47,12 @@ const navigationConfig = {
   [UserRoles.BILLING]: [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
     { name: 'Billing', href: '/dashboard/billing', icon: CreditCardIcon, resource: 'billing' },
-    { name: 'Clients', href: '/dashboard/clients', icon: UsersIcon, resource: 'clients' },
+    { name: 'Clients', href: '/clients', icon: UsersIcon, resource: 'clients' },
     { name: 'Reports', href: '/dashboard/reports', icon: ChartBarIcon, resource: 'reports' },
   ],
   [UserRoles.RECEPTIONIST]: [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-    { name: 'Clients', href: '/dashboard/clients', icon: UsersIcon, resource: 'clients' },
+    { name: 'Clients', href: '/clients', icon: UsersIcon, resource: 'clients' },
     { name: 'Appointments', href: '/dashboard/appointments', icon: CalendarIcon, resource: 'appointments' },
     { name: 'Therapists', href: '/dashboard/therapists', icon: UsersIcon, resource: 'therapists' },
   ],

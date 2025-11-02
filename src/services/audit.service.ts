@@ -178,3 +178,49 @@ export async function logAccountUnlocked(
     details,
   });
 }
+
+/**
+ * Generic audit log parameters
+ */
+export type LogAuditParams = {
+  userId: string;
+  action: string;
+  resource: string;
+  resourceId?: string | null;
+  phiAccessed?: boolean;
+  ipAddress?: string;
+  userAgent?: string;
+  metadata?: Record<string, any> | null;
+};
+
+/**
+ * Generic audit logging function
+ * Use this for logging data access and modifications
+ */
+export async function logAudit(
+  tenantId: string,
+  params: LogAuditParams,
+): Promise<void> {
+  const {
+    userId,
+    action,
+    resource,
+    resourceId = null,
+    phiAccessed = false,
+    ipAddress = 'unknown',
+    userAgent = 'unknown',
+    metadata = null,
+  } = params;
+
+  await db.insert(auditLogs).values({
+    tenantId,
+    userId,
+    action,
+    resource,
+    resourceId,
+    ipAddress,
+    userAgent,
+    phiAccessed,
+    changes: metadata,
+  });
+}
