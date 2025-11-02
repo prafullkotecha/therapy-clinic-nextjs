@@ -6,9 +6,6 @@ export * from './appointment.schema';
 // Client schemas
 export * from './client.schema';
 
-// Counter schema (from boilerplate - for demo purposes)
-export * from './counter.schema';
-
 // Documentation schemas
 export * from './documentation.schema';
 

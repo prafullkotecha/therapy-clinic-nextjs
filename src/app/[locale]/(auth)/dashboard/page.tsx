@@ -1,6 +1,12 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import { Hello } from '@/components/Hello';
+import { AdminDashboard } from '@/components/dashboards/AdminDashboard';
+import { BillingDashboard } from '@/components/dashboards/BillingDashboard';
+import { ReceptionistDashboard } from '@/components/dashboards/ReceptionistDashboard';
+import { TherapistDashboard } from '@/components/dashboards/TherapistDashboard';
+import { auth } from '@/lib/auth';
+import { UserRoles } from '@/lib/rbac';
+import { extractPrimaryRole } from '@/lib/role-utils';
 
 export async function generateMetadata(props: {
   params: Promise<{ locale: string }>;
@@ -16,10 +22,21 @@ export async function generateMetadata(props: {
   };
 }
 
-export default function Dashboard() {
-  return (
-    <div className="py-5 [&_p]:my-6">
-      <Hello />
-    </div>
-  );
+export default async function DashboardPage() {
+  const session = await auth();
+  const userRole = extractPrimaryRole(session?.user?.roles);
+
+  // Render role-specific dashboard
+  switch (userRole) {
+    case UserRoles.ADMIN:
+      return <AdminDashboard />;
+    case UserRoles.THERAPIST:
+      return <TherapistDashboard />;
+    case UserRoles.BILLING:
+      return <BillingDashboard />;
+    case UserRoles.RECEPTIONIST:
+      return <ReceptionistDashboard />;
+    default:
+      return <TherapistDashboard />;
+  }
 }
