@@ -91,6 +91,28 @@ You are working on GitHub issue #{{ISSUE_NUMBER}} for the therapy-clinic-nextjs 
    - List what to review carefully
    - Confirm app verified and running
 
+11. **Suggest next issue** (REQUIRED):
+   - Query project board status: `gh project item-list 1 --owner prafullkotecha --format json --limit 100`
+   - Identify "Sprint Ready" issues (status: "🎯 Sprint Ready")
+   - Check dependencies are satisfied (cross-reference with "✅ Done" issues)
+   - Consider phase progression (Phase 1 → Phase 2 → Phase 3, etc.)
+   - Recommend 1-2 next issues with reasoning:
+     * Why this issue is ready
+     * What dependencies are satisfied
+     * How it fits into the overall plan
+     * Any blockers or alternatives
+   - Format:
+     ```
+     ## Recommended Next Issue: #X - Issue Title
+
+     **Why:**
+     - Dependency reason
+     - Priority reason
+     - Flow reason
+
+     **Alternatives:** #Y (if applicable)
+     ```
+
 ## Context Files to Reference
 
 - **CLAUDE.md** - TypeScript best practices, architecture, patterns
