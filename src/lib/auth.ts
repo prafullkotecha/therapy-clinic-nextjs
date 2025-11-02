@@ -4,6 +4,7 @@ import Keycloak from 'next-auth/providers/keycloak';
 import { db } from '@/libs/DB';
 import { users } from '@/models/user.schema';
 import { logLoginSuccess } from '@/services/audit.service';
+import { clearFailedAttempts, isAccountLocked } from '@/services/lockout.service';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -15,7 +16,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
-      // Log successful login to audit logs
+      // Check account lockout and log successful login
       try {
         if (account && profile) {
           const tenantId = (profile as any).tenant_id as string | undefined;
@@ -30,11 +31,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               .limit(1);
 
             if (dbUser) {
+              // Check if account is locked
+              const locked = await isAccountLocked(tenantId, dbUser.email, 'email');
+              if (locked) {
+                // Prevent login for locked accounts
+                return false;
+              }
+
               // Update last login timestamp
               await db
                 .update(users)
                 .set({ lastLoginAt: new Date() })
                 .where(eq(users.id, dbUser.id));
+
+              // Clear any failed login attempts on successful login
+              await clearFailedAttempts(tenantId, dbUser.email);
 
               // Log the login event
               // Note: We don't have access to request headers here

@@ -138,3 +138,43 @@ export async function logRegister(
     userAgent,
   });
 }
+
+/**
+ * Log an account lockout event
+ */
+export async function logAccountLocked(
+  tenantId: string,
+  userId: string,
+  ipAddress: string,
+  userAgent: string,
+  details?: Record<string, any>,
+): Promise<void> {
+  await logAuthEvent({
+    tenantId,
+    userId,
+    eventType: 'account_locked',
+    ipAddress,
+    userAgent,
+    details,
+  });
+}
+
+/**
+ * Log an account unlock event
+ */
+export async function logAccountUnlocked(
+  tenantId: string,
+  userId: string,
+  ipAddress: string,
+  userAgent: string,
+  details?: Record<string, any>,
+): Promise<void> {
+  await logAuthEvent({
+    tenantId,
+    userId,
+    eventType: 'account_unlocked',
+    ipAddress,
+    userAgent,
+    details,
+  });
+}
