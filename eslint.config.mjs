@@ -30,6 +30,7 @@ export default antfu(
     ignores: [
       'migrations/**/*',
       '*.md',
+      'docs/**/*',
       '.claude/**/*',
     ],
   },
