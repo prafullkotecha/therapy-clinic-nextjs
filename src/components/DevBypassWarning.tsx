@@ -2,6 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import { DEV_BYPASS_TOKEN } from '@/lib/constants';
 
 /**
  * Development Auth Bypass Warning Banner
@@ -13,8 +14,8 @@ export function DevBypassWarning(): React.JSX.Element | null {
   const { data: session } = useSession();
 
   // Only show if user is logged in via dev bypass
-  // (accessToken will be 'dev-bypass-token' for dev bypass logins)
-  if (!session || session.accessToken !== 'dev-bypass-token') {
+  // (accessToken will be DEV_BYPASS_TOKEN for dev bypass logins)
+  if (!session || session.accessToken !== DEV_BYPASS_TOKEN) {
     return null;
   }
 

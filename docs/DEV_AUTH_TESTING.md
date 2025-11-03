@@ -38,6 +38,14 @@ npm run dev
 
 Open your browser to: `http://localhost:3000/en/dev-login`
 
+## How Dev Bypass Works
+
+Unlike production Keycloak authentication, dev bypass authenticates users **by email only** - no password required. Simply select a role from the dev-login page to sign in immediately.
+
+This bypasses all OAuth flows and directly creates a session based on the database user record.
+
+**Important:** Dev bypass still enforces account lockout policies. If an account is locked due to failed login attempts, you'll need to manually unlock it (see [Troubleshooting](#account-locked-after-failed-attempts) below).
+
 ## Test User Accounts
 
 The seed script creates four test users with different roles:
@@ -201,6 +209,24 @@ When dev bypass is active, you'll see:
 **Info:** Sessions timeout after 15 minutes (HIPAA requirement)
 
 **Solution:** This is expected behavior. Sign in again to continue testing.
+
+### Account locked after failed attempts
+
+**Cause:** Dev bypass enforces account lockout after 5 failed login attempts (same as production Keycloak)
+
+**Solution:** Manually unlock the account in development:
+
+```sql
+-- Connect to your database
+psql $DATABASE_URL
+
+-- Unlock account by clearing failed login attempts
+DELETE FROM failed_login_attempts WHERE email = 'user@example.com';
+```
+
+Replace `user@example.com` with the locked user's email address.
+
+**Note:** In production, admins use the admin UI to unlock accounts. This SQL command is for development only.
 
 ## Switching Back to Keycloak
 

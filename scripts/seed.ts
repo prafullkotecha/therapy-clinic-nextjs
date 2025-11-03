@@ -38,6 +38,15 @@ import {
 import { users } from '@/models/user.schema';
 
 /**
+ * Format Date object to PostgreSQL date format (YYYY-MM-DD)
+ * @param date - Date object to format
+ * @returns Formatted date string
+ */
+function formatDateForPostgres(date: Date): string {
+  return date.toISOString().split('T')[0]!;
+}
+
+/**
  * Main seed function
  */
 async function seed(): Promise<void> {
@@ -222,6 +231,11 @@ async function seedLocations(tenantId: string): Promise<string[]> {
     .returning({ id: locations.id });
 
   const locationIds = insertedLocations.map(l => l.id);
+
+  if (locationIds.length < 2) {
+    throw new Error('Expected at least 2 locations to be seeded');
+  }
+
   console.log(`✅ ${locationIds.length} locations created\n`);
   return locationIds;
 }
@@ -490,6 +504,11 @@ async function seedTherapists(
     .returning({ id: therapists.id });
 
   const therapistIds = insertedTherapists.map(t => t.id);
+
+  if (therapistIds.length < 3) {
+    throw new Error('Expected at least 3 therapists to be seeded');
+  }
+
   console.log(`✅ ${therapistIds.length} therapists created\n`);
   return therapistIds;
 }
@@ -652,7 +671,7 @@ async function seedClients(
       primaryLocationId: faker.helpers.arrayElement(locationIds),
       firstName: encryption.encrypt(firstName),
       lastName: encryption.encrypt(lastName),
-      dateOfBirth: encryption.encrypt(dob.toISOString().split('T')[0]!),
+      dateOfBirth: encryption.encrypt(formatDateForPostgres(dob)),
       email: encryption.encrypt(`${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`),
       phone: encryption.encrypt(faker.phone.number()),
       address: encryption.encrypt(faker.location.streetAddress()),
@@ -677,8 +696,8 @@ async function seedClients(
       insuranceGroupNumber: encryption.encrypt(faker.string.alphanumeric(8).toUpperCase()),
       status,
       intakeDate: status !== ClientStatus.INTAKE
-        ? faker.date.past({ years: 1 }).toISOString().split('T')[0]!
-        : new Date().toISOString().split('T')[0]!,
+        ? formatDateForPostgres(faker.date.past({ years: 1 }))
+        : formatDateForPostgres(new Date()),
       assignedTherapistId: assignedTherapistId || null,
       matchScore: assignedTherapistId ? faker.number.int({ min: 75, max: 98 }) : null,
       matchReasoning: assignedTherapistId
@@ -961,7 +980,7 @@ async function seedClientNeeds(
       ...n,
       tenantId,
       assessmentDate: new Date(),
-      nextReassessment: faker.date.future({ years: 0.5 }).toISOString().split('T')[0]!,
+      nextReassessment: formatDateForPostgres(faker.date.future({ years: 0.5 })),
     })),
   );
 
@@ -1002,7 +1021,7 @@ async function seedAppointments(
       locationId: faker.helpers.arrayElement(locationIds),
       clientId: clientIds[clientIndex]!,
       therapistId: therapistIds[therapistIndex]!,
-      appointmentDate: appointmentDate.toISOString().split('T')[0]!,
+      appointmentDate: formatDateForPostgres(appointmentDate),
       startTime,
       endTime,
       duration: 60,

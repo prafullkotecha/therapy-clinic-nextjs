@@ -3,6 +3,7 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import Keycloak from 'next-auth/providers/keycloak';
 import { getAuthRequestContext } from '@/lib/auth-context';
+import { DEV_BYPASS_TOKEN } from '@/lib/constants';
 import { db } from '@/libs/DB';
 import { Env } from '@/libs/Env';
 import { users } from '@/models/user.schema';
@@ -77,11 +78,32 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // Dev bypass provider
         if (account?.provider === 'dev-bypass') {
           // User is already fetched and validated in authorize()
-          // Just update last login timestamp
+          // Fetch user again to get tenantId for lockout check
+          const [dbUser] = await db
+            .select()
+            .from(users)
+            .where(eq(users.id, user.id as string))
+            .limit(1);
+
+          if (!dbUser) {
+            return false;
+          }
+
+          // Check if account is locked (mirrors Keycloak behavior)
+          const locked = await isAccountLocked(dbUser.tenantId, dbUser.email, 'email');
+          if (locked) {
+            // Prevent login for locked accounts
+            return false;
+          }
+
+          // Update last login timestamp
           await db
             .update(users)
             .set({ lastLoginAt: new Date() })
-            .where(eq(users.id, user.id as string));
+            .where(eq(users.id, dbUser.id));
+
+          // Clear any failed login attempts on successful login
+          await clearFailedAttempts(dbUser.tenantId, dbUser.email);
 
           return true;
         }
@@ -141,8 +163,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (account) {
         // Dev bypass provider
         if (account.provider === 'dev-bypass' && user) {
-          token.accessToken = 'dev-bypass-token';
-          token.idToken = 'dev-bypass-token';
+          token.accessToken = DEV_BYPASS_TOKEN;
+          token.idToken = DEV_BYPASS_TOKEN;
           token.roles = user.roles || [];
           token.tenantId = user.tenantId as string;
         } else if (profile) {
