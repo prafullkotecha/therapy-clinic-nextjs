@@ -13,37 +13,57 @@ You are working on GitHub issue #{{ISSUE_NUMBER}} for the therapy-clinic-nextjs 
    gh issue view {{ISSUE_NUMBER}}
    ```
 
-2. **Analyze the issue**:
+2. **Update project board to "In Progress"**:
+   ```bash
+   # Get project item ID for this issue
+   ITEM_ID=$(gh project item-list 1 --owner prafullkotecha --format json | \
+     jq -r ".items[] | select(.content.number == {{ISSUE_NUMBER}}) | .id")
+
+   # Get Status field ID
+   STATUS_FIELD_ID=$(gh project field-list 1 --owner prafullkotecha --format json | \
+     jq -r '.fields[] | select(.name == "Status") | .id')
+
+   # Get "In Progress" option ID
+   IN_PROGRESS_ID=$(gh project field-list 1 --owner prafullkotecha --format json | \
+     jq -r '.fields[] | select(.name == "Status") | .options[] | select(.name == "🏗️ In Progress") | .id')
+
+   # Update status
+   gh project item-edit --id "$ITEM_ID" --project-id 1 --field-id "$STATUS_FIELD_ID" --single-select-option-id "$IN_PROGRESS_ID"
+
+   echo "✅ Moved issue #{{ISSUE_NUMBER}} to 'In Progress' on project board"
+   ```
+
+3. **Analyze the issue**:
    - Read the full description and acceptance criteria
    - Check for related issues or dependencies
    - Review any linked PRs or discussions
 
-3. **Create a plan**:
+4. **Create a plan**:
    - Break down the work into actionable tasks
    - Use TodoWrite tool to track progress
    - Consider TypeScript best practices from CLAUDE.md
    - Consider HIPAA compliance requirements if applicable
 
-4. **Create feature branch**:
+5. **Create feature branch**:
    ```bash
    git checkout -b pk/issue-{{ISSUE_NUMBER}}-<short-description>
    ```
    Branch naming: `pk/issue-{{ISSUE_NUMBER}}-<kebab-case-description>`
    Example: `pk/issue-5-add-client-search`
 
-5. **Implementation**:
+6. **Implementation**:
    - Follow the patterns in CLAUDE.md and IMPLEMENTATION_PLAN.md
    - Write code with proper TypeScript types (use `interface` for module augmentation)
    - Ensure all PHI fields are encrypted
    - Add tests if required
 
-6. **Testing**:
+7. **Testing**:
    - Run `npm run check:types` - MUST pass
    - Run `npm run lint` - MUST pass
    - Run relevant tests
    - Test database migrations if applicable
 
-7. **Verify application** (CRITICAL):
+8. **Verify application** (CRITICAL):
    - Start dev server: `npm run dev` (in background)
    - Wait for "Ready in X.Xs" message
    - Verify HTTP response: `curl http://localhost:3000`
@@ -51,7 +71,7 @@ You are working on GitHub issue #{{ISSUE_NUMBER}} for the therapy-clinic-nextjs 
    - Confirm app loads successfully
    - See `/verify-app` command for details
 
-8. **Commit with DCO sign-off**:
+9. **Commit with DCO sign-off**:
    - **ALWAYS use `-s` flag** for DCO compliance
    - Follow conventional commits format
    - Reference the issue: `Resolves #{{ISSUE_NUMBER}}`
@@ -74,17 +94,29 @@ You are working on GitHub issue #{{ISSUE_NUMBER}} for the therapy-clinic-nextjs 
    )"
    ```
 
-9. **Push and create PR** (automatic, no asking):
-   ```bash
-   git push -u origin pk/issue-{{ISSUE_NUMBER}}-<description>
+10. **Push and create PR** (automatic, no asking):
+    ```bash
+    git push -u origin pk/issue-{{ISSUE_NUMBER}}-<description>
 
-   gh pr create \
-     --title "feat: <concise title>" \
-     --body "<PR description with implementation details>" \
-     --label "ready-for-review"
-   ```
+    gh pr create \
+      --title "feat: <concise title>" \
+      --body "<PR description with implementation details>" \
+      --label "ready-for-review"
+    ```
 
-10. **Inform user**:
+11. **Update project board to "In Review"** (after PR created):
+    ```bash
+    # Get "In Review" option ID
+    IN_REVIEW_ID=$(gh project field-list 1 --owner prafullkotecha --format json | \
+      jq -r '.fields[] | select(.name == "Status") | .options[] | select(.name == "👀 In Review") | .id')
+
+    # Update status
+    gh project item-edit --id "$ITEM_ID" --project-id 1 --field-id "$STATUS_FIELD_ID" --single-select-option-id "$IN_REVIEW_ID"
+
+    echo "✅ Moved issue #{{ISSUE_NUMBER}} to 'In Review' on project board"
+    ```
+
+12. **Inform user**:
    - Provide PR URL
    - Summarize what was done
    - Note any important decisions or trade-offs
