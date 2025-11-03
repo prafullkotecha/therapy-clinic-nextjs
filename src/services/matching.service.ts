@@ -315,12 +315,7 @@ export class MatchingService {
     let totalWeight = 0;
 
     for (const required of requiredSpecializations) {
-      const weight
-        = required.importance === 'critical'
-          ? this.IMPORTANCE_WEIGHTS.critical
-          : required.importance === 'preferred'
-            ? this.IMPORTANCE_WEIGHTS.preferred
-            : this.IMPORTANCE_WEIGHTS.nice_to_have;
+      const weight = this.IMPORTANCE_WEIGHTS[required.importance];
       totalWeight += weight;
 
       // Check if therapist has this specialization
@@ -330,14 +325,10 @@ export class MatchingService {
 
       if (match) {
         // Score based on proficiency level
-        let proficiencyScore = 0;
-        if (match.proficiencyLevel === 'expert') {
-          proficiencyScore = this.PROFICIENCY_SCORES.expert;
-        } else if (match.proficiencyLevel === 'proficient') {
-          proficiencyScore = this.PROFICIENCY_SCORES.proficient;
-        } else if (match.proficiencyLevel === 'familiar') {
-          proficiencyScore = this.PROFICIENCY_SCORES.familiar;
-        }
+        const proficiencyScore
+          = this.PROFICIENCY_SCORES[
+            match.proficiencyLevel as keyof typeof this.PROFICIENCY_SCORES
+          ] ?? 0;
 
         totalScore += proficiencyScore * weight;
       } else if (required.importance === 'critical') {
