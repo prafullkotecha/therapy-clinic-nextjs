@@ -72,7 +72,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ageGroup,
       preferredTimes,
       urgency,
-      maxResults = 5,
+      maxResults,
     } = validatedData.data;
 
     // Calculate matches

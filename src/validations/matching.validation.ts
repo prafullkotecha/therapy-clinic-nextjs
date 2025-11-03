@@ -24,7 +24,7 @@ export const matchCriteriaSchema = z.object({
   ageGroup: z.string().optional(),
   preferredTimes: z.array(z.string()).optional(),
   urgency: urgencyLevelSchema.optional(),
-  maxResults: z.number().int().min(1).max(20).optional().default(5),
+  maxResults: z.number().int().min(1).max(20).default(5),
 });
 
 // Match details schema

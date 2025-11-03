@@ -6,16 +6,25 @@ import { specializations } from '@/models/specialization.schema';
 import { therapists, therapistSpecializations } from '@/models/therapist.schema';
 
 // Types for matching
+export type RequiredSpecialization = {
+  specializationId: string;
+  specializationName?: string;
+  importance: 'critical' | 'preferred' | 'nice_to_have';
+};
+
+export type SchedulePreferences = {
+  preferredTimes?: string[];
+  preferredDays?: string[];
+};
+
+export type UrgencyLevel = 'urgent' | 'high' | 'standard' | 'low';
+
 export type MatchCriteria = {
-  requiredSpecializations: Array<{
-    specializationId: string;
-    specializationName?: string;
-    importance: 'critical' | 'preferred' | 'nice_to_have';
-  }>;
+  requiredSpecializations: RequiredSpecialization[];
   communicationNeeds?: string;
   ageGroup?: string;
   preferredTimes?: string[];
-  urgency?: 'urgent' | 'high' | 'standard' | 'low';
+  urgency?: UrgencyLevel;
 };
 
 export type TherapistMatch = {
@@ -39,6 +48,45 @@ type TherapistWithSpecializations = InferSelectModel<typeof therapists> & {
     yearsExperience: number | null;
   }>;
 };
+
+/**
+ * Type guards for validating jsonb data from database
+ */
+function isRequiredSpecialization(obj: unknown): obj is RequiredSpecialization {
+  return (
+    typeof obj === 'object'
+    && obj !== null
+    && typeof (obj as Record<string, unknown>).specializationId === 'string'
+    && ['critical', 'preferred', 'nice_to_have'].includes(
+      (obj as Record<string, unknown>).importance as string,
+    )
+  );
+}
+
+function isRequiredSpecializationArray(
+  value: unknown,
+): value is RequiredSpecialization[] {
+  return Array.isArray(value) && value.every(isRequiredSpecialization);
+}
+
+function isSchedulePreferences(value: unknown): value is SchedulePreferences {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const obj = value as Record<string, unknown>;
+  return (
+    obj.preferredTimes === undefined
+    || (Array.isArray(obj.preferredTimes)
+      && obj.preferredTimes.every(t => typeof t === 'string'))
+  );
+}
+
+function isUrgencyLevel(value: unknown): value is UrgencyLevel {
+  return (
+    typeof value === 'string'
+    && ['urgent', 'high', 'standard', 'low'].includes(value)
+  );
+}
 
 /**
  * Matching Service - Calculate therapist-client matches
@@ -79,14 +127,34 @@ export class MatchingService {
 
   /**
    * Get available therapists with their specializations
+   * Uses single JOIN query to avoid N+1 performance issues
    */
   private async getAvailableTherapists(
     tenantId: string,
   ): Promise<TherapistWithSpecializations[]> {
-    // Get therapists who are accepting new clients
-    const availableTherapists = await db
-      .select()
+    // Single query with LEFT JOIN to get therapists and their specializations
+    const results = await db
+      .select({
+        therapist: therapists,
+        specialization: {
+          specializationId: therapistSpecializations.specializationId,
+          specializationName: specializations.name,
+          proficiencyLevel: therapistSpecializations.proficiencyLevel,
+          yearsExperience: therapistSpecializations.yearsExperience,
+        },
+      })
       .from(therapists)
+      .leftJoin(
+        therapistSpecializations,
+        and(
+          eq(therapistSpecializations.therapistId, therapists.id),
+          eq(therapistSpecializations.tenantId, tenantId),
+        ),
+      )
+      .leftJoin(
+        specializations,
+        eq(specializations.id, therapistSpecializations.specializationId),
+      )
       .where(
         and(
           eq(therapists.tenantId, tenantId),
@@ -94,36 +162,35 @@ export class MatchingService {
         ),
       );
 
-    // Get specializations for each therapist
-    const therapistsWithSpecs = await Promise.all(
-      availableTherapists.map(async (therapist: InferSelectModel<typeof therapists>) => {
-        const specs = await db
-          .select({
-            specializationId: therapistSpecializations.specializationId,
-            specializationName: specializations.name,
-            proficiencyLevel: therapistSpecializations.proficiencyLevel,
-            yearsExperience: therapistSpecializations.yearsExperience,
-          })
-          .from(therapistSpecializations)
-          .innerJoin(
-            specializations,
-            eq(specializations.id, therapistSpecializations.specializationId),
-          )
-          .where(
-            and(
-              eq(therapistSpecializations.tenantId, tenantId),
-              eq(therapistSpecializations.therapistId, therapist.id),
-            ),
-          );
+    // Group results by therapist ID
+    const therapistMap = new Map<string, TherapistWithSpecializations>();
 
-        return {
-          ...therapist,
-          specializations: specs,
-        };
-      }),
-    );
+    for (const row of results) {
+      const therapistId = row.therapist.id;
 
-    return therapistsWithSpecs;
+      if (!therapistMap.has(therapistId)) {
+        therapistMap.set(therapistId, {
+          ...row.therapist,
+          specializations: [],
+        });
+      }
+
+      // Add specialization if it exists (LEFT JOIN may return null)
+      if (
+        row.specialization.specializationId
+        && row.specialization.specializationName
+        && row.specialization.proficiencyLevel
+      ) {
+        therapistMap.get(therapistId)!.specializations.push({
+          specializationId: row.specialization.specializationId,
+          specializationName: row.specialization.specializationName,
+          proficiencyLevel: row.specialization.proficiencyLevel,
+          yearsExperience: row.specialization.yearsExperience,
+        });
+      }
+    }
+
+    return Array.from(therapistMap.values());
   }
 
   /**
@@ -223,8 +290,7 @@ export class MatchingService {
 
         totalScore += proficiencyScore * weight;
       } else if (required.importance === 'critical') {
-        // If critical specialization is missing, it's a significant penalty
-        totalScore += 0; // No points for missing critical spec
+        // Critical specialization missing - no points awarded (significant penalty)
       }
     }
 
@@ -429,13 +495,27 @@ export class MatchingService {
       return null;
     }
 
+    // Validate and parse jsonb fields with type guards
+    const requiredSpecializations = isRequiredSpecializationArray(
+      need.requiredSpecializations,
+    )
+      ? need.requiredSpecializations
+      : [];
+
+    const schedulePrefs = isSchedulePreferences(need.schedulePreferences)
+      ? need.schedulePreferences
+      : null;
+
+    const urgency = isUrgencyLevel(need.urgencyLevel)
+      ? need.urgencyLevel
+      : 'standard';
+
     return {
-      requiredSpecializations: (need.requiredSpecializations as any[]) || [],
+      requiredSpecializations,
       communicationNeeds: need.communicationNeeds || undefined,
       ageGroup: undefined, // Will come from client record
-      preferredTimes:
-        (need.schedulePreferences as any)?.preferredTimes || undefined,
-      urgency: (need.urgencyLevel as any) || 'standard',
+      preferredTimes: schedulePrefs?.preferredTimes || undefined,
+      urgency,
     };
   }
 }
