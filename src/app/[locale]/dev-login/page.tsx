@@ -72,9 +72,9 @@ export default function DevLoginPage(): React.JSX.Element {
         // Redirect to dashboard based on role
         const redirectMap: Record<string, string> = {
           admin: '/admin',
-          therapist: '/therapist',
-          billing: '/billing',
-          receptionist: '/receptionist',
+          therapist: '/dashboard/therapist',
+          billing: '/dashboard',
+          receptionist: '/dashboard',
         };
 
         const roleKey = roleName.toLowerCase();

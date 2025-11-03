@@ -30,7 +30,9 @@ export async function setTenantContext(
   }
 
   // Set the PostgreSQL session variable for RLS policies
-  await db.execute(sql`SET LOCAL app.current_tenant = ${tenantId}`);
+  // Note: SET LOCAL doesn't accept parameterized queries, so we use sql.raw()
+  // The tenantId is validated as UUID above to prevent SQL injection
+  await db.execute(sql.raw(`SET LOCAL app.current_tenant = '${tenantId}'`));
 }
 
 /**
