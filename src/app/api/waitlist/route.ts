@@ -25,6 +25,9 @@ export async function GET(_request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // Defense-in-depth: Explicit tenant filter supplements RLS policy
+    // This pattern is used throughout the codebase (see appointment.service.ts)
+    // Provides extra safety if RLS policies are misconfigured or disabled
     const waitlistEntries = await withTenantContext(tenantId, async () => {
       return db.select().from(waitlist).where(eq(waitlist.tenantId, tenantId));
     });
@@ -69,7 +72,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    await addToWaitlist(
+    const newEntry = await addToWaitlist(
       tenantId,
       validatedData.data.clientId,
       validatedData.data.therapistId,
@@ -78,10 +81,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       validatedData.data.priority,
     );
 
-    return NextResponse.json(
-      { message: 'Client added to waitlist' },
-      { status: 201 },
-    );
+    return NextResponse.json(newEntry, { status: 201 });
   } catch (error) {
     console.error('Error adding to waitlist:', error);
 

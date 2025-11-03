@@ -550,17 +550,26 @@ export async function addToWaitlist(
   preferredDates?: string[],
   preferredTimes?: string[],
   priority: 'standard' | 'urgent' = 'standard',
-): Promise<void> {
+) {
   return withTenantContext(tenantId, async () => {
-    await db.insert(waitlist).values({
-      tenantId,
-      clientId,
-      therapistId,
-      preferredDates: preferredDates || [],
-      preferredTimes: preferredTimes || [],
-      priority,
-      status: 'waiting',
-    });
+    const [newEntry] = await db
+      .insert(waitlist)
+      .values({
+        tenantId,
+        clientId,
+        therapistId,
+        preferredDates: preferredDates || [],
+        preferredTimes: preferredTimes || [],
+        priority,
+        status: 'waiting',
+      })
+      .returning();
+
+    if (!newEntry) {
+      throw new Error('Failed to add to waitlist');
+    }
+
+    return newEntry;
   });
 }
 
