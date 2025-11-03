@@ -5,6 +5,7 @@ export const Env = createEnv({
   server: {
     ARCJET_KEY: z.string().startsWith('ajkey_').optional(),
     DATABASE_URL: z.string().min(1),
+    DEV_BYPASS_AUTH: z.string().optional(),
     KEYCLOAK_URL: z.string().url().optional(),
     KEYCLOAK_REALM: z.string().optional(),
     KEYCLOAK_CLIENT_ID: z.string().optional(),
@@ -26,6 +27,7 @@ export const Env = createEnv({
   runtimeEnv: {
     ARCJET_KEY: process.env.ARCJET_KEY,
     DATABASE_URL: process.env.DATABASE_URL,
+    DEV_BYPASS_AUTH: process.env.DEV_BYPASS_AUTH,
     KEYCLOAK_URL: process.env.KEYCLOAK_URL,
     KEYCLOAK_REALM: process.env.KEYCLOAK_REALM,
     KEYCLOAK_CLIENT_ID: process.env.KEYCLOAK_CLIENT_ID,

@@ -1,24 +1,92 @@
 import { eq } from 'drizzle-orm';
 import NextAuth from 'next-auth';
+import Credentials from 'next-auth/providers/credentials';
 import Keycloak from 'next-auth/providers/keycloak';
 import { getAuthRequestContext } from '@/lib/auth-context';
 import { db } from '@/libs/DB';
+import { Env } from '@/libs/Env';
 import { users } from '@/models/user.schema';
 import { logLoginSuccess } from '@/services/audit.service';
 import { clearFailedAttempts, isAccountLocked } from '@/services/lockout.service';
 
+// Development auth bypass - only enabled when DEV_BYPASS_AUTH=true and NODE_ENV=development
+const isDevBypassEnabled = Env.DEV_BYPASS_AUTH === 'true' && Env.NODE_ENV === 'development';
+
+// Production safety check
+if (Env.DEV_BYPASS_AUTH === 'true' && Env.NODE_ENV === 'production') {
+  throw new Error(
+    'SECURITY ERROR: DEV_BYPASS_AUTH cannot be enabled in production! '
+    + 'This would bypass all authentication and allow unauthorized access.',
+  );
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
-    Keycloak({
-      clientId: process.env.KEYCLOAK_CLIENT_ID!,
-      clientSecret: process.env.KEYCLOAK_CLIENT_SECRET!,
-      issuer: `${process.env.KEYCLOAK_URL}/realms/${process.env.KEYCLOAK_REALM}`,
-    }),
+    // Development bypass provider - fetch real user from database by email
+    ...(isDevBypassEnabled
+      ? [
+          Credentials({
+            id: 'dev-bypass',
+            name: 'Development Bypass',
+            credentials: {
+              email: { label: 'Email', type: 'text' },
+            },
+            async authorize(credentials) {
+              if (!credentials?.email) {
+                return null;
+              }
+
+              // Fetch user from database
+              const [dbUser] = await db
+                .select()
+                .from(users)
+                .where(eq(users.email, credentials.email as string))
+                .limit(1);
+
+              if (!dbUser || !dbUser.isActive) {
+                return null;
+              }
+
+              // Return user object that will be used in JWT/session
+              return {
+                id: dbUser.id,
+                email: dbUser.email,
+                name: `${dbUser.firstName} ${dbUser.lastName}`,
+                roles: [dbUser.role],
+                tenantId: dbUser.tenantId,
+              };
+            },
+          }),
+        ]
+      : []),
+    // Keycloak provider (disabled in dev when bypass is enabled)
+    ...((!isDevBypassEnabled)
+      ? [
+          Keycloak({
+            clientId: process.env.KEYCLOAK_CLIENT_ID!,
+            clientSecret: process.env.KEYCLOAK_CLIENT_SECRET!,
+            issuer: `${process.env.KEYCLOAK_URL}/realms/${process.env.KEYCLOAK_REALM}`,
+          }),
+        ]
+      : []),
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
       // Check account lockout and log successful login
       try {
+        // Dev bypass provider
+        if (account?.provider === 'dev-bypass') {
+          // User is already fetched and validated in authorize()
+          // Just update last login timestamp
+          await db
+            .update(users)
+            .set({ lastLoginAt: new Date() })
+            .where(eq(users.id, user.id as string));
+
+          return true;
+        }
+
+        // Keycloak provider
         if (account && profile) {
           const tenantId = (profile as any).tenant_id as string | undefined;
           const keycloakId = user.id;
@@ -68,13 +136,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       return true;
     },
-    async jwt({ token, account, profile }) {
+    async jwt({ token, account, profile, user }) {
       // Persist additional user info in the JWT
-      if (account && profile) {
-        token.accessToken = account.access_token;
-        token.idToken = account.id_token;
-        token.roles = (profile as any).realm_access?.roles || [];
-        token.tenantId = (profile as any).tenant_id;
+      if (account) {
+        // Dev bypass provider
+        if (account.provider === 'dev-bypass' && user) {
+          token.accessToken = 'dev-bypass-token';
+          token.idToken = 'dev-bypass-token';
+          token.roles = user.roles || [];
+          token.tenantId = user.tenantId as string;
+        } else if (profile) {
+          // Keycloak provider
+          token.accessToken = account.access_token;
+          token.idToken = account.id_token;
+          token.roles = (profile as any).realm_access?.roles || [];
+          token.tenantId = (profile as any).tenant_id;
+        }
       }
       return token;
     },
