@@ -22,7 +22,7 @@ export async function setTenantContext(
     throw new Error('Tenant ID is required for tenant context');
   }
 
-  // Validate UUID format
+  // Validate UUID format to prevent SQL injection
   const uuidRegex
     = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
   if (!uuidRegex.test(tenantId)) {
@@ -30,9 +30,8 @@ export async function setTenantContext(
   }
 
   // Set the PostgreSQL session variable for RLS policies
-  // Note: SET LOCAL doesn't accept parameterized queries, so we use sql.raw()
-  // The tenantId is validated as UUID above to prevent SQL injection
-  await db.execute(sql.raw(`SET LOCAL app.current_tenant = '${tenantId}'`));
+  // Using ::uuid cast allows PostgreSQL to accept parameterized query
+  await db.execute(sql`SET LOCAL app.current_tenant = ${tenantId}::uuid`);
 }
 
 /**

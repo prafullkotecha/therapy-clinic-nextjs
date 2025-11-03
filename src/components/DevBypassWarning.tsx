@@ -48,7 +48,7 @@ export function DevBypassWarning(): React.JSX.Element | null {
                 )
                 {userEmail && (
                   <span className="ml-1 text-yellow-700">
-                    •
+                    {' • '}
                     {userEmail}
                   </span>
                 )}

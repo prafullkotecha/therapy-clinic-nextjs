@@ -14,6 +14,7 @@ import { useState } from 'react';
 const DEV_USERS = [
   {
     role: 'Admin',
+    redirectPath: '/admin',
     email: 'admin@brightfutures.test',
     name: 'Alexandra Martinez',
     description: 'Full system access, user management, reports',
@@ -23,6 +24,7 @@ const DEV_USERS = [
   },
   {
     role: 'Therapist',
+    redirectPath: '/dashboard/therapist',
     email: 'dr.sarah.johnson@brightfutures.test',
     name: 'Dr. Sarah Johnson',
     description: 'ABA specialist, manage clients, appointments, session notes',
@@ -32,6 +34,7 @@ const DEV_USERS = [
   },
   {
     role: 'Billing',
+    redirectPath: '/dashboard',
     email: 'lisa.anderson@brightfutures.test',
     name: 'Lisa Anderson',
     description: 'Invoices, insurance claims, payment processing',
@@ -41,6 +44,7 @@ const DEV_USERS = [
   },
   {
     role: 'Receptionist',
+    redirectPath: '/dashboard',
     email: 'james.wilson@brightfutures.test',
     name: 'James Wilson',
     description: 'Schedule appointments, check-ins, waitlist management',
@@ -55,7 +59,7 @@ export default function DevLoginPage(): React.JSX.Element {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSignIn(email: string, roleName: string): Promise<void> {
+  async function handleSignIn(email: string, redirectPath: string, roleName: string): Promise<void> {
     setLoading(roleName);
     setError(null);
 
@@ -69,16 +73,8 @@ export default function DevLoginPage(): React.JSX.Element {
         setError(`Failed to sign in: ${result.error}`);
         setLoading(null);
       } else if (result?.ok) {
-        // Redirect to dashboard based on role
-        const redirectMap: Record<string, string> = {
-          admin: '/admin',
-          therapist: '/dashboard/therapist',
-          billing: '/dashboard',
-          receptionist: '/dashboard',
-        };
-
-        const roleKey = roleName.toLowerCase();
-        router.push(redirectMap[roleKey] || '/admin');
+        // Redirect to role-specific dashboard
+        router.push(redirectPath);
       }
     } catch (err) {
       setError(`Sign in error: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -148,7 +144,7 @@ export default function DevLoginPage(): React.JSX.Element {
 
                   <button
                     type="button"
-                    onClick={() => handleSignIn(user.email, user.role)}
+                    onClick={() => handleSignIn(user.email, user.redirectPath, user.role)}
                     disabled={loading !== null}
                     className={`mt-4 w-full rounded-md px-4 py-2 text-sm font-medium text-white transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none ${
                       loading === user.role
