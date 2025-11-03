@@ -78,19 +78,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // Dev bypass provider
         if (account?.provider === 'dev-bypass') {
           // User is already fetched and validated in authorize()
-          // Fetch user again to get tenantId for lockout check
-          const [dbUser] = await db
-            .select()
-            .from(users)
-            .where(eq(users.id, user.id as string))
-            .limit(1);
-
-          if (!dbUser) {
-            return false;
-          }
+          // Access tenantId and email from user object (no need to re-fetch)
+          const tenantId = user.tenantId as string;
+          const userEmail = user.email as string;
+          const userId = user.id as string;
 
           // Check if account is locked (mirrors Keycloak behavior)
-          const locked = await isAccountLocked(dbUser.tenantId, dbUser.email, 'email');
+          const locked = await isAccountLocked(tenantId, userEmail, 'email');
           if (locked) {
             // Prevent login for locked accounts
             return false;
@@ -100,10 +94,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           await db
             .update(users)
             .set({ lastLoginAt: new Date() })
-            .where(eq(users.id, dbUser.id));
+            .where(eq(users.id, userId));
 
           // Clear any failed login attempts on successful login
-          await clearFailedAttempts(dbUser.tenantId, dbUser.email);
+          await clearFailedAttempts(tenantId, userEmail);
 
           return true;
         }

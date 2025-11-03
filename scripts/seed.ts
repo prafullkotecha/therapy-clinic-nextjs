@@ -12,7 +12,7 @@
 
 import type { PHIEncryptionService } from '@/lib/encryption';
 import { faker } from '@faker-js/faker';
-import { sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { getEncryptionService } from '@/lib/encryption';
 import { db } from '@/libs/DB';
 
@@ -618,7 +618,7 @@ async function seedTherapistSpecializations(
   const result = await db
     .select({ tenantId: therapists.tenantId })
     .from(therapists)
-    .where(sql`${therapists.id} = ${therapistIds[0]!}`)
+    .where(eq(therapists.id, therapistIds[0]!))
     .limit(1);
 
   const firstTherapist = result[0];
