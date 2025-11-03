@@ -215,6 +215,10 @@ export async function updateAvailabilityOverride(
       )
       .returning();
 
+    if (!updated) {
+      throw new Error('Availability override not found');
+    }
+
     await logAudit(tenantId, {
       userId,
       action: 'update',
@@ -253,6 +257,22 @@ export async function deleteAvailabilityOverride(
       resourceId: overrideId,
       phiAccessed: false,
     });
+  });
+}
+
+/**
+ * Helper function to filter out time slots that overlap with unavailable/blocked periods
+ * Uses proper time comparison to handle edge cases
+ */
+function filterOverlappingSlots(
+  slots: { start: string; end: string }[],
+  overrideStart: string,
+  overrideEnd: string,
+): { start: string; end: string }[] {
+  return slots.filter((slot) => {
+    // No overlap if slot ends before or at override start, or starts after or at override end
+    // Using <= and >= ensures proper handling of adjacent time slots (e.g., 10:00-11:00 and 11:00-12:00)
+    return slot.end <= overrideStart || slot.start >= overrideEnd;
   });
 }
 
@@ -305,9 +325,10 @@ export async function getEffectiveAvailability(
       if (override.availabilityType === 'unavailable') {
         // Remove slots during unavailable time
         if (override.startTime && override.endTime) {
-          effectiveSlots = effectiveSlots.filter(
-            slot =>
-              slot.end <= override.startTime! || slot.start >= override.endTime!,
+          effectiveSlots = filterOverlappingSlots(
+            effectiveSlots,
+            override.startTime,
+            override.endTime,
           );
         } else {
           // All-day unavailable
@@ -326,9 +347,10 @@ export async function getEffectiveAvailability(
       } else if (override.availabilityType === 'blocked') {
         // Remove blocked time
         if (override.startTime && override.endTime) {
-          effectiveSlots = effectiveSlots.filter(
-            slot =>
-              slot.end <= override.startTime! || slot.start >= override.endTime!,
+          effectiveSlots = filterOverlappingSlots(
+            effectiveSlots,
+            override.startTime,
+            override.endTime,
           );
         }
       }

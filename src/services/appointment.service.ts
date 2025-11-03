@@ -194,6 +194,7 @@ export async function checkConflicts(
         eq(appointments.status, 'scheduled'),
         eq(appointments.status, 'confirmed'),
         eq(appointments.status, 'in_progress'),
+        eq(appointments.status, 'checked_in'),
       ),
     ];
 
@@ -209,14 +210,11 @@ export async function checkConflicts(
 
     const conflicts = conflictingAppointments
       .filter((apt) => {
-        // Check time overlap
+        // Check time overlap using standard interval overlap logic
+        // Two intervals [a,b) and [c,d) overlap if a < d and b > c
         const aptStart = apt.startTime;
         const aptEnd = apt.endTime;
-        return (
-          (startTime >= aptStart && startTime < aptEnd)
-          || (endTime > aptStart && endTime <= aptEnd)
-          || (startTime <= aptStart && endTime >= aptEnd)
-        );
+        return startTime < aptEnd && endTime > aptStart;
       })
       .map(apt => ({
         appointmentId: apt.id,
@@ -466,7 +464,9 @@ export async function rescheduleAppointment(
     // Cancel existing appointment
     await cancelAppointment(tenantId, userId, appointmentId, {
       reason: input.reason || 'rescheduled',
-      note: `Rescheduled to ${input.newDate} ${input.newStartTime}-${input.newEndTime}`,
+      note: input.note
+        ? `${input.note}. Rescheduled to ${input.newDate} ${input.newStartTime}-${input.newEndTime}`
+        : `Rescheduled to ${input.newDate} ${input.newStartTime}-${input.newEndTime}`,
     });
 
     // Create new appointment
