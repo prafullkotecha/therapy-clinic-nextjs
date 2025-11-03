@@ -36,7 +36,7 @@ npm run dev
 
 ### 4. Navigate to Dev Login Page
 
-Open your browser to: `http://localhost:3000/dev-login`
+Open your browser to: `http://localhost:3000/en/dev-login`
 
 ## Test User Accounts
 
