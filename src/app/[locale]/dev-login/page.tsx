@@ -24,7 +24,7 @@ const DEV_USERS = [
   },
   {
     role: 'Therapist',
-    redirectPath: '/dashboard/therapist',
+    redirectPath: '/dashboard',
     email: 'dr.sarah.johnson@brightfutures.test',
     name: 'Dr. Sarah Johnson',
     description: 'ABA specialist, manage clients, appointments, session notes',
