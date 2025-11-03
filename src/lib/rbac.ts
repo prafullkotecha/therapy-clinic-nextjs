@@ -23,7 +23,8 @@ export type Resource
     | 'audit_logs'
     | 'billing'
     | 'reports'
-    | 'specializations';
+    | 'specializations'
+    | 'matching';
 
 export type Action = 'create' | 'read' | 'update' | 'delete';
 
@@ -41,6 +42,7 @@ const PERMISSIONS: Record<UserRole, Record<Resource, Action[]>> = {
     billing: ['create', 'read', 'update', 'delete'],
     reports: ['read'],
     specializations: ['create', 'read', 'update', 'delete'],
+    matching: ['read'], // Can find therapist matches
   },
   therapist: {
     clients: ['read', 'update'], // Only assigned clients
@@ -52,6 +54,7 @@ const PERMISSIONS: Record<UserRole, Record<Resource, Action[]>> = {
     billing: ['read'], // Can view billing for own clients
     reports: ['read'], // Own performance reports
     specializations: ['read'], // Can view specializations
+    matching: ['read'], // Can find matches for own clients
   },
   billing: {
     clients: ['read'], // View client info for billing
@@ -63,6 +66,7 @@ const PERMISSIONS: Record<UserRole, Record<Resource, Action[]>> = {
     billing: ['create', 'read', 'update'], // Full billing access
     reports: ['read'], // Billing reports
     specializations: ['read'], // Can view specializations
+    matching: [], // No matching access
   },
   receptionist: {
     clients: ['create', 'read', 'update'], // Intake and scheduling
@@ -74,6 +78,7 @@ const PERMISSIONS: Record<UserRole, Record<Resource, Action[]>> = {
     billing: [], // No billing access
     reports: [], // No reports
     specializations: ['read'], // Can view specializations
+    matching: ['read'], // Can find therapist matches during intake
   },
 };
 
