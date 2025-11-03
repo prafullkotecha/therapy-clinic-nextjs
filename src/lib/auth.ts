@@ -22,6 +22,7 @@ if (Env.DEV_BYPASS_AUTH === 'true' && Env.NODE_ENV === 'production') {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true, // Required for localhost in development
   providers: [
     // Development bypass provider - fetch real user from database by email
     ...(isDevBypassEnabled
@@ -157,6 +158,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (account) {
         // Dev bypass provider
         if (account.provider === 'dev-bypass' && user) {
+          token.sub = user.id; // Set user ID in token.sub for NextAuth v5
           token.accessToken = DEV_BYPASS_TOKEN;
           token.idToken = DEV_BYPASS_TOKEN;
           token.roles = user.roles || [];
@@ -173,16 +175,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     async session({ session, token }) {
       // Make roles and tenant available on the session
-      return {
+      // Note: Spreading session.user after setting id would overwrite it,
+      // so we explicitly build the user object with all properties
+      const updatedSession = {
         ...session,
         user: {
-          ...session.user,
+          ...session.user, // Spread existing user props first
+          id: (token.sub as string) || session.user.id || '', // Then set/override ID from token.sub
           roles: (token.roles as string[]) || [],
           tenantId: (token.tenantId as string) || '',
         },
         accessToken: (token.accessToken as string) || '',
         idToken: (token.idToken as string) || '',
       };
+
+      return updatedSession;
     },
   },
   pages: {

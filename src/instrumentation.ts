@@ -36,6 +36,18 @@ export async function register() {
       Sentry.init(sentryOptions);
     }
   }
+
+  // Initialize PHI encryption service (Node.js runtime only)
+  // Use dynamic import to avoid loading node:crypto in Edge runtime
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    try {
+      const { getEncryptionService } = await import('@/lib/encryption');
+      await getEncryptionService();
+    } catch (error) {
+      console.error('[INSTRUMENTATION] Failed to initialize PHI encryption service:', error);
+      // Don't throw - allow app to start but encryption will fail at runtime
+    }
+  }
 }
 
 export const onRequestError = Sentry.captureRequestError;
