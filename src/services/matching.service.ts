@@ -91,14 +91,65 @@ function isUrgencyLevel(value: unknown): value is UrgencyLevel {
 /**
  * Matching Service - Calculate therapist-client matches
  *
- * Scoring weights:
- * - Specializations: 40%
- * - Communication: 25%
- * - Availability: 15%
- * - Age Match: 10%
- * - Caseload: 10%
+ * Uses weighted multi-factor scoring algorithm to rank therapist-client compatibility.
+ * All scoring weights and thresholds are defined as constants for maintainability.
  */
 export class MatchingService {
+  /**
+   * Main scoring algorithm weights (must sum to 1.0)
+   * These determine the relative importance of each matching factor
+   */
+  private readonly SCORING_WEIGHTS = {
+    specialization: 0.4, // 40% - Most important: clinical expertise match
+    communication: 0.25, // 25% - Critical for client needs (e.g., non-verbal)
+    availability: 0.15, // 15% - Schedule flexibility
+    ageMatch: 0.1, // 10% - Age group expertise
+    caseload: 0.1, // 10% - Current capacity
+  } as const;
+
+  /**
+   * Specialization importance multipliers
+   * Higher weights for critical specializations vs nice-to-have
+   */
+  private readonly IMPORTANCE_WEIGHTS = {
+    critical: 3, // Must-have specialization (e.g., ABA for autism)
+    preferred: 2, // Strongly desired but not required
+    nice_to_have: 1, // Beneficial but optional
+  } as const;
+
+  /**
+   * Proficiency level scoring
+   * Based on therapist's expertise level in a specialization
+   */
+  private readonly PROFICIENCY_SCORES = {
+    expert: 100, // 5+ years or certified specialist
+    proficient: 80, // Regular practice, good competency
+    familiar: 60, // Some experience, can handle cases
+  } as const;
+
+  /**
+   * Availability scoring thresholds
+   * Based on number of available time slots per week
+   */
+  private readonly AVAILABILITY_THRESHOLDS = {
+    excellent: { minSlots: 20, score: 100 }, // Very flexible schedule
+    good: { minSlots: 15, score: 90 }, // Good availability
+    adequate: { minSlots: 10, score: 80 }, // Moderate availability
+    limited: { minSlots: 5, score: 70 }, // Limited slots
+    minimal: { minSlots: 0, score: 50 }, // Very few slots
+  } as const;
+
+  /**
+   * Caseload utilization thresholds
+   * Lower utilization = more capacity for new clients
+   */
+  private readonly CASELOAD_THRESHOLDS = {
+    low: 0.5, // <50% utilized - plenty of capacity
+    moderate: 0.75, // 50-75% utilized - good capacity
+    high: 0.9, // 75-90% utilized - limited capacity
+    // >90% = approaching full capacity
+  } as const;
+
   /**
    * Calculate matches for a client based on their needs
    */
@@ -217,11 +268,11 @@ export class MatchingService {
 
     // Weighted total score (0-100)
     const matchScore
-      = specializationScore * 0.4
-        + communicationScore * 0.25
-        + availabilityScore * 0.15
-        + ageMatchScore * 0.1
-        + caseloadScore * 0.1;
+      = specializationScore * this.SCORING_WEIGHTS.specialization
+        + communicationScore * this.SCORING_WEIGHTS.communication
+        + availabilityScore * this.SCORING_WEIGHTS.availability
+        + ageMatchScore * this.SCORING_WEIGHTS.ageMatch
+        + caseloadScore * this.SCORING_WEIGHTS.caseload;
 
     const reasoning = this.generateMatchReasoning(
       therapist,
@@ -266,10 +317,10 @@ export class MatchingService {
     for (const required of requiredSpecializations) {
       const weight
         = required.importance === 'critical'
-          ? 3
+          ? this.IMPORTANCE_WEIGHTS.critical
           : required.importance === 'preferred'
-            ? 2
-            : 1;
+            ? this.IMPORTANCE_WEIGHTS.preferred
+            : this.IMPORTANCE_WEIGHTS.nice_to_have;
       totalWeight += weight;
 
       // Check if therapist has this specialization
@@ -281,11 +332,11 @@ export class MatchingService {
         // Score based on proficiency level
         let proficiencyScore = 0;
         if (match.proficiencyLevel === 'expert') {
-          proficiencyScore = 100;
+          proficiencyScore = this.PROFICIENCY_SCORES.expert;
         } else if (match.proficiencyLevel === 'proficient') {
-          proficiencyScore = 80;
+          proficiencyScore = this.PROFICIENCY_SCORES.proficient;
         } else if (match.proficiencyLevel === 'familiar') {
-          proficiencyScore = 60;
+          proficiencyScore = this.PROFICIENCY_SCORES.familiar;
         }
 
         totalScore += proficiencyScore * weight;
@@ -346,19 +397,19 @@ export class MatchingService {
     }
 
     // More availability = higher score
-    if (totalSlots >= 20) {
-      return 100;
+    if (totalSlots >= this.AVAILABILITY_THRESHOLDS.excellent.minSlots) {
+      return this.AVAILABILITY_THRESHOLDS.excellent.score;
     }
-    if (totalSlots >= 15) {
-      return 90;
+    if (totalSlots >= this.AVAILABILITY_THRESHOLDS.good.minSlots) {
+      return this.AVAILABILITY_THRESHOLDS.good.score;
     }
-    if (totalSlots >= 10) {
-      return 80;
+    if (totalSlots >= this.AVAILABILITY_THRESHOLDS.adequate.minSlots) {
+      return this.AVAILABILITY_THRESHOLDS.adequate.score;
     }
-    if (totalSlots >= 5) {
-      return 70;
+    if (totalSlots >= this.AVAILABILITY_THRESHOLDS.limited.minSlots) {
+      return this.AVAILABILITY_THRESHOLDS.limited.score;
     }
-    return 50;
+    return this.AVAILABILITY_THRESHOLDS.minimal.score;
   }
 
   /**
@@ -401,13 +452,13 @@ export class MatchingService {
     const utilizationRate = currentCaseload / maxCaseload;
 
     // Prefer therapists with some availability but not completely empty
-    if (utilizationRate < 0.5) {
+    if (utilizationRate < this.CASELOAD_THRESHOLDS.low) {
       return 100; // Less than 50% utilized - plenty of capacity
     }
-    if (utilizationRate < 0.75) {
+    if (utilizationRate < this.CASELOAD_THRESHOLDS.moderate) {
       return 80; // 50-75% utilized - good capacity
     }
-    if (utilizationRate < 0.9) {
+    if (utilizationRate < this.CASELOAD_THRESHOLDS.high) {
       return 60; // 75-90% utilized - limited capacity
     }
     return 40; // 90%+ utilized - very limited capacity

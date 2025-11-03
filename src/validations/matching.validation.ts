@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+/**
+ * Max results configuration for matching API
+ */
+export const MAX_RESULTS_MIN = 1;
+export const MAX_RESULTS_MAX = 20;
+export const MAX_RESULTS_DEFAULT = 5;
+
 // Specialization importance levels
 export const specializationImportanceSchema = z.enum([
   'critical',
@@ -24,7 +31,12 @@ export const matchCriteriaSchema = z.object({
   ageGroup: z.string().optional(),
   preferredTimes: z.array(z.string()).optional(),
   urgency: urgencyLevelSchema.optional(),
-  maxResults: z.number().int().min(1).max(20).default(5),
+  maxResults: z
+    .number()
+    .int()
+    .min(MAX_RESULTS_MIN)
+    .max(MAX_RESULTS_MAX)
+    .default(MAX_RESULTS_DEFAULT),
 });
 
 // Match details schema
