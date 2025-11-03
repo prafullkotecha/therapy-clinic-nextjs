@@ -2,172 +2,322 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project
+## Quick Reference
 
-Multi-tenant, HIPAA-compliant behavioral therapy clinic management system. Supports multiple clinic organizations (tenants), each with multiple locations, intelligent therapist-client matching, appointment scheduling, and comprehensive compliance infrastructure.
+**Project:** Multi-tenant, HIPAA-compliant behavioral therapy clinic management system. Supports multiple clinic organizations (tenants), each with multiple locations, intelligent therapist-client matching, appointment scheduling, and comprehensive compliance infrastructure.
 
-**Base Template:** ixartz Next.js Boilerplate
-**Architecture:** Multi-tenant SaaS with tenant isolation via PostgreSQL RLS
+**Base:** ixartz Next.js Boilerplate
+**Architecture:** Multi-tenant SaaS with PostgreSQL RLS isolation
 
-## Tech Stack
+### Tech Stack
+| Category | Technologies |
+|----------|-------------|
+| **Core** | Next.js 16 (App Router), TypeScript, React 19, PostgreSQL 15+, Drizzle ORM |
+| **Auth** | Keycloak (self-hosted, HIPAA-compliant) |
+| **Caching** | Redis (AWS ElastiCache) |
+| **Styling** | Tailwind CSS 4, React Hook Form + Zod |
+| **Calendar** | FullCalendar |
+| **Testing** | Vitest, Playwright, Testing Library |
+| **Infrastructure** | AWS ECS Fargate, RDS, ElastiCache, S3, KMS, CloudWatch |
+| **Third-Party** | SendGrid (email), Twilio (SMS), Arcjet (WAF), Sentry |
 
-### Core
-- **Framework:** Next.js 16 (App Router), TypeScript, React 19
-- **Database:** PostgreSQL 15+ (AWS RDS) with Drizzle ORM
-- **Auth:** Keycloak (self-hosted, HIPAA-compliant)
-- **Caching:** Redis (AWS ElastiCache)
-- **Styling:** Tailwind CSS 4
-- **Forms:** React Hook Form + Zod validation
-- **Calendar:** FullCalendar
-- **Testing:** Vitest, Playwright, Testing Library
+### Key Commands
+```bash
+npm run dev                   # Start dev (port from .env.local)
+npm run build                 # Production build
+npm run type-check            # TypeScript check
+npm run db:migrate            # Run migrations
+npm run db:studio             # Open Drizzle Studio
+npm run test:unit             # Unit tests
+/work-issue N                 # Start working on issue
+/complete-issue N             # Complete and merge PR
+```
 
-### Infrastructure (AWS)
-- **Compute:** ECS Fargate
-- **Database:** RDS PostgreSQL (Multi-AZ, encrypted)
-- **Cache:** ElastiCache Redis
-- **Storage:** S3 (encrypted PHI documents)
-- **Secrets:** KMS (encryption keys), Secrets Manager
-- **Monitoring:** CloudWatch, Sentry (with BAA)
+### Environment Variables
+See `.env.example`. Critical: `DATABASE_URL`, `REDIS_URL`, `KEYCLOAK_URL`, `KEYCLOAK_CLIENT_SECRET`, `AWS_KMS_KEY_ID`
 
-### Third-Party Services
-- **Email:** SendGrid (with BAA)
-- **SMS:** Twilio (with BAA)
-- **Security:** Arcjet (WAF, bot detection)
+## Architecture Essentials
 
-## TypeScript Best Practices
+### Multi-Tenancy Design
+- **Isolation:** PostgreSQL RLS policies enforce tenant boundaries
+- **Context:** Extracted from Keycloak JWT, injected via middleware
+- **Hierarchy:** Tenant → Locations → Users → Clients/Therapists/Appointments
 
-**CRITICAL:** These guidelines are based on Matt Pocock's Total TypeScript (2025) and TypeScript 5.7/5.8 best practices. **NEVER** compromise type safety or use workarounds. Fix type errors correctly.
+**Every table pattern:**
+```typescript
+tenantId: uuid('tenant_id').references(() => tenants.id).notNull();
+```
 
-### Module Augmentation & Declaration Merging
+**Always include tenant in queries:**
+```typescript
+// ✅ Correct
+const clients = await db.select().from(clientsTable)
+  .where(eq(clientsTable.tenantId, tenantId));
 
-**Rule #1: ALWAYS use `interface` for module augmentation, NEVER `type`**
+// ❌ Wrong - fails RLS
+const clients = await db.select().from(clientsTable);
+```
+
+**Middleware sets context:**
+```typescript
+await db.execute(sql`SET LOCAL app.current_tenant = ${tenantId}`);
+```
+
+### Security & HIPAA Compliance
+
+**Encryption:**
+- Format: `keyId:iv:authTag:ciphertext` (AES-256-GCM)
+- Master keys in AWS KMS with rotation
+- PHI fields use `text` type (e.g., `first_name_encrypted`)
+
+**Encrypt before storing:**
+```typescript
+import { encryptionService } from '@/lib/encryption';
+
+const client = await db.insert(clients).values({
+  tenantId,
+  firstName: encryptionService.encrypt(data.firstName),
+  lastName: encryptionService.encrypt(data.lastName),
+  ageGroup: data.ageGroup, // Non-PHI as-is
+});
+```
+
+**Decrypt when reading:**
+```typescript
+const decrypted = {
+  ...client,
+  firstName: encryptionService.decrypt(client.firstName),
+};
+```
+
+**Security Checklist:**
+- ✅ Encrypt PHI before storing
+- ✅ Log PHI access (auto via middleware)
+- ✅ Use RBAC (principle of least privilege)
+- ✅ Include tenant context in queries
+- ✅ SSL/TLS for all connections
+- ✅ 15-min session timeout
+- ❌ Never log PHI plaintext
+- ❌ Never expose PHI in URLs
+- ❌ Never skip tenant checks
+- ❌ Never bypass audit logging
+
+**RBAC:**
+- Roles: admin, therapist, billing, receptionist
+```typescript
+import { checkPermission } from '@/middleware/rbac.middleware';
+
+if (!checkPermission(userRole, 'clients', 'update', clientId, userId)) {
+  return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+}
+```
+
+**Audit Logging (auto via middleware):**
+```typescript
+await logAudit({
+  tenantId, userId,
+  action: 'update',
+  resource: 'client',
+  resourceId: clientId,
+  phiAccessed: true,
+});
+```
+
+### Database Schema Patterns
+
+**RLS policy template:**
+```sql
+CREATE POLICY tenant_isolation ON table_name
+  USING (tenant_id = current_setting('app.current_tenant')::uuid);
+```
+
+## Common Tasks
+
+### Adding a New Entity
+
+1. Schema in `src/models/entity.schema.ts`:
+```typescript
+export const entities = pgTable('entities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  // ... fields
+});
+```
+
+2. RLS policy in migration:
+```sql
+CREATE POLICY tenant_isolation_policy ON entities
+  USING (tenant_id = current_setting('app.current_tenant')::uuid);
+```
+
+3. Create service, API routes, UI components, validation schema
+
+### Adding API Route
 
 ```typescript
-// ✅ CORRECT - Uses interface for declaration merging
+// src/app/api/clients/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/middleware/auth.middleware';
+import { checkPermission } from '@/middleware/rbac.middleware';
+
+export const GET = withAuth(async (req: NextRequest) => {
+  const { userId, userRole, tenantId } = req.auth;
+
+  if (!checkPermission(userRole, 'clients', 'read')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const clients = await db.select().from(clientsTable)
+    .where(eq(clientsTable.tenantId, tenantId));
+
+  // Decrypt PHI
+  const decrypted = clients.map(c => ({
+    ...c,
+    firstName: encryptionService.decrypt(c.firstName),
+  }));
+
+  await logAudit({ tenantId, userId, action: 'read', resource: 'clients', phiAccessed: true });
+
+  return NextResponse.json(decrypted);
+});
+```
+
+### Matching Algorithm
+
+Located in `services/matching.service.ts`. Weights: Specializations 40%, Communication 30%, Availability 15%, Age 10%, Schedule 5%.
+
+```typescript
+const matches = await matchingService.calculateMatches(tenantId, {
+  requiredSpecializations: [{ specializationId, specializationName: 'ABA', importance: 'critical' }],
+  communicationNeeds: 'non-verbal',
+  ageGroup: 'early_childhood',
+  urgency: 'standard',
+}, therapists);
+// Returns top 5 matches with scores
+```
+
+## Project Structure
+
+```
+src/
+├── app/                      # Next.js App Router
+│   ├── (auth)/              # Public auth routes
+│   ├── (dashboard)/         # Protected routes
+│   │   ├── admin/           # Admin portal (clients, therapists, appointments, reports)
+│   │   └── therapist/       # Therapist portal
+│   └── api/                 # API routes
+├── components/              # UI components (clients, therapists, scheduling, ui)
+├── lib/                     # Core services (keycloak, encryption, audit, matching)
+├── services/                # Business logic (client, therapist, appointment, matching, notification)
+├── models/                  # Drizzle schemas (tenant, user, client, therapist, appointment)
+├── middleware/              # Middleware (tenant, auth, rbac, audit)
+├── utils/                   # Utilities (encryption, date)
+└── validations/             # Zod schemas
+```
+
+## Testing Guidelines
+
+| Type | Focus |
+|------|-------|
+| **Unit** | Business logic, matching algorithm, encryption |
+| **Integration** | Workflows, tenant isolation, RBAC, audit logging |
+| **E2E** | User journeys, forms, calendar, role-specific UIs |
+
+Commands: `npm run test:unit`, `npm run test:integration`, `npm run test:e2e`, `npm run test:coverage`
+
+## Visual Development
+
+### Design Principles
+- Comprehensive checklist: `/context/design-principles.md`
+- Brand guide: `/context/style-guide.md`
+- Always refer to these files for UI/UX changes
+
+### Quick Visual Check (After Every Front-End Change)
+1. Identify what changed
+2. Navigate to affected pages (`mcp__playwright__browser_navigate`)
+3. Verify design compliance vs. design-principles.md & style-guide.md
+4. Validate feature implementation
+5. Check acceptance criteria
+6. Capture screenshot (desktop 1440px)
+7. Check errors (`mcp__playwright__browser_console_messages`)
+
+### Comprehensive Design Review
+Use `design-reviewer` subagent (Task tool) for:
+- Significant UI/UX features
+- Before finalizing PRs with visual changes
+- Comprehensive accessibility/responsiveness testing
+
+## Deployment
+
+See `infrastructure/terraform/` for AWS IaC.
+
+**Steps:**
+1. Build: `docker build -t therapy-clinic-app .`
+2. Push to ECR
+3. Update ECS task definition
+4. Run migrations: `npm run db:migrate`
+5. Monitor CloudWatch logs
+
+## Documentation
+
+- **Implementation Plan:** `IMPLEMENTATION_PLAN.md`
+- **API Docs:** `docs/API.md` (TBD)
+- **HIPAA Compliance:** `docs/HIPAA_COMPLIANCE.md` (TBD)
+- **Security:** `docs/SECURITY.md` (TBD)
+
+## Reference: TypeScript Best Practices
+
+**Consult when:** Module augmentation, complex type errors, performance issues
+
+Based on Matt Pocock's Total TypeScript (2025) and TypeScript 5.7/5.8. **NEVER** use `as` or `any` to bypass errors.
+
+### Module Augmentation (ONLY use case for `interface` over `type`)
+
+```typescript
+// ✅ Declaration merging requires interface
 declare module 'next-auth' {
-  // Disable the eslint rule that prefers type over interface
   // eslint-disable-next-line ts/consistent-type-definitions
   interface Session {
     user: { roles: string[] } & DefaultSession['user'];
   }
 }
-
-// ❌ WRONG - type doesn't support declaration merging
-declare module 'next-auth' {
-  type Session = {  // Won't work!
-    user: { roles: string[] } & DefaultSession['user'];
-  };
-}
 ```
 
-**Why:** TypeScript's declaration merging only works with `interface`. Using `type` creates a type alias that overwrites instead of merging. This is essential for extending third-party library types.
+**Rules:**
+1. Use `interface` for module augmentation (type doesn't merge)
+2. File must be in module scope (has import/export)
+3. Can only patch existing declarations
 
-**Rule #2: Module augmentation files must be in module scope**
+### Core Principles
 
-```typescript
-// ✅ CORRECT - Has import/export (module scope)
-import type { DefaultSession } from 'next-auth';
-
-declare module 'next-auth' {
-  interface Session { /* ... */ }
-}
-
-// ❌ WRONG - Script scope, augmentation won't work
-declare module 'next-auth' {
-  interface Session { /* ... */ }
-}
-```
-
-**Rule #3: Can only patch existing declarations, not add new top-level ones**
-
-### Type Safety Principles
-
-**1. Declare return types for top-level module functions**
-```typescript
-// ✅ CORRECT - Explicit return type
-export async function getUser(id: string): Promise<User | null> {
-  return await db.query.users.findFirst({ where: eq(users.id, id) });
-}
-
-// ❌ AVOID - Implicit return type (harder for AI/humans to understand)
-export async function getUser(id: string) {
-  return await db.query.users.findFirst({ where: eq(users.id, id) });
-}
-```
-
-**2. Prefer `interface extends` over `type &` for performance**
-```typescript
-// ✅ CORRECT - Better IDE/tsc performance
-interface ExtendedUser extends BaseUser {
-  roles: string[];
-}
-
-// ❌ SLOWER - Intersection types are slower to resolve
-type ExtendedUser = BaseUser & {
-  roles: string[];
-};
-```
-
-**3. Leverage type inference, minimize explicit annotations**
-```typescript
-// ✅ CORRECT - Let TypeScript infer
-const users = await db.select().from(usersTable);  // Type is inferred
-
-// ❌ UNNECESSARY - Redundant annotation
-const users: User[] = await db.select().from(usersTable);
-```
-
-**4. Use branded types for additional type safety**
-```typescript
-// ✅ CORRECT - Prevents mixing string types
-type ClientId = string & { readonly __brand: 'ClientId' };
-type TherapistId = string & { readonly __brand: 'TherapistId' };
-
-function getClient(id: ClientId) { /* ... */ }
-getClient('123' as ClientId);  // Explicit branding required
-```
-
-**5. Understand generics placement matters**
-```typescript
-// ✅ CORRECT - Generic at function level allows inference
-function processItems<T>(items: T[]): T[] { /* ... */ }
-
-// ❌ WRONG - Generic at wrong level
-interface Processor {
-  process<T>(items: T[]): T[];  // May not infer correctly
-}
-```
+| Principle | Example |
+|-----------|---------|
+| **Declare return types** | `export async function getUser(id: string): Promise<User \| null>` |
+| **`interface extends` > `type &`** | Better IDE/tsc performance |
+| **Leverage inference** | Let TypeScript infer when possible |
+| **Branded types** | `type ClientId = string & { readonly __brand: 'ClientId' }` |
+| **Generic placement** | Function-level generics allow better inference |
 
 ### Common Patterns
 
-**Assertion Functions & Type Predicates**
+**Type predicates & assertions:**
 ```typescript
-// ✅ Type predicate
 function isClient(user: User): user is Client {
   return user.type === 'client';
 }
 
-// ✅ Assertion function
 function assertClient(user: User): asserts user is Client {
   if (user.type !== 'client') throw new Error('Not a client');
 }
 ```
 
-**Const Assertions for Literal Types**
+**Const assertions:**
 ```typescript
-// ✅ CORRECT - Preserves literal types
 const ROLES = ['admin', 'therapist', 'billing'] as const;
-type Role = typeof ROLES[number];  // 'admin' | 'therapist' | 'billing'
-
-// ❌ WRONG - Type widened to string[]
-const ROLES = ['admin', 'therapist', 'billing'];
-type Role = typeof ROLES[number];  // string
+type Role = typeof ROLES[number]; // 'admin' | 'therapist' | 'billing'
 ```
 
-### Next-Auth / Auth.js Specific
-
-**Known Issue:** User interface augmentation doesn't always work in callbacks (next-auth v5). Use type assertions if needed:
-
+**Next-Auth workaround (known issue):**
 ```typescript
 // In callbacks where User augmentation fails:
 async jwt({ token, account, profile }) {
@@ -180,436 +330,39 @@ async jwt({ token, account, profile }) {
 
 ### Error Handling
 
-**NEVER use type assertions or `any` to bypass errors.** If you encounter a type error:
+**NEVER bypass with `as` or `any`.** Instead:
 
-1. **Understand the root cause** - What is TypeScript trying to protect you from?
-2. **Fix the types correctly** - Use proper type narrowing, guards, or generics
-3. **Document why** - If a workaround is needed, explain in comments
+1. Understand root cause
+2. Fix types correctly (narrowing, guards, generics)
+3. Document workarounds
 
 ```typescript
-// ❌ NEVER DO THIS
-const user = data as User;  // Bypassing type safety!
-const result: any = await fetch();  // Losing all type information!
-
-// ✅ DO THIS INSTEAD
+// ✅ Correct
 const userResult = UserSchema.safeParse(data);
 if (!userResult.success) throw new Error('Invalid user data');
 const user = userResult.data;
+
+// ❌ Never do this
+const user = data as User;
 ```
-
-### TypeScript 5.7/5.8 Features (2025)
-
-- **Better error reporting:** Use `--target es2024` for latest ECMAScript features
-- **Granular return type checking:** Conditional expressions in return statements checked per branch
-- **Node.js ESM support:** Can now `require()` ESM modules with `--module nodenext`
-- **V8 compile caching:** Faster subsequent builds in Node.js
 
 ### Resources
 
-- [Total TypeScript](https://www.totaltypescript.com/) - Matt Pocock's comprehensive TypeScript training
+- [Total TypeScript](https://www.totaltypescript.com/) - Matt Pocock's training
 - [TypeScript 5.8 Release Notes](https://devblogs.microsoft.com/typescript/announcing-typescript-5-8/)
 - [Auth.js TypeScript Guide](https://authjs.dev/getting-started/typescript)
 
-## Architecture Overview
-
-### Multi-Tenancy Design
-- **Isolation:** Row-Level Security (PostgreSQL RLS policies)
-- **Tenant Context:** Extracted from Keycloak JWT, injected via middleware
-- **Schema:** Shared schema, isolated data per tenant
-- **Hierarchy:** Tenant → Locations → Users → Clients/Therapists/Appointments
-
-### Key Security Features
-- **Encryption:** AES-256-GCM for PHI fields (format: `keyId:iv:authTag:ciphertext`)
-- **Master Keys:** Stored in AWS KMS with rotation
-- **Audit Logging:** Every PHI access logged (user, resource, timestamp)
-- **RBAC:** Roles: admin, therapist, billing, receptionist
-- **Session Timeout:** 15 minutes (Redis-backed)
-
-### Database Schema Patterns
-
-**Every table includes:**
-```typescript
-tenantId: uuid('tenant_id').references(() => tenants.id).notNull();
-```
-
-**Encrypted PHI fields use `text` type:**
-```typescript
-firstName: text('first_name_encrypted').notNull();
-```
-
-**RLS policies enforce tenant isolation:**
-```sql
-CREATE POLICY tenant_isolation ON table_name
-  USING (tenant_id = current_setting('app.current_tenant')::uuid);
-```
-
-## Development Commands
-
-### Setup
-```bash
-npm install                    # Install dependencies
-npm run db:generate           # Generate Drizzle migrations
-npm run db:migrate            # Run migrations
-npm run db:seed               # Seed specializations taxonomy
-```
-
-### Development
-```bash
-npm run dev                   # Start dev server (localhost:3000)
-npm run build                 # Production build
-npm run start                 # Start production server
-npm run type-check            # TypeScript check
-npm run lint                  # ESLint
-npm run format                # Prettier
-```
-
-### Testing
-```bash
-npm run test:unit             # Unit tests (Vitest)
-npm run test:integration      # Integration tests
-npm run test:e2e              # E2E tests (Playwright)
-npm run test:coverage         # Coverage report
-```
-
-### Database
-```bash
-npm run db:studio             # Open Drizzle Studio
-npm run db:push               # Push schema changes (dev only)
-npm run db:drop               # Drop database (dev only)
-```
-
-## Project Structure
-
-```
-src/
-├── app/                      # Next.js App Router
-│   ├── (auth)/              # Public auth routes
-│   ├── (dashboard)/         # Protected routes
-│   │   ├── admin/           # Admin portal
-│   │   │   ├── clients/     # Client management
-│   │   │   ├── therapists/  # Therapist management
-│   │   │   ├── appointments/# Scheduling
-│   │   │   └── reports/     # Analytics
-│   │   └── therapist/       # Therapist portal
-│   └── api/                 # API routes
-├── components/
-│   ├── clients/             # Client components
-│   ├── therapists/          # Therapist components
-│   ├── scheduling/          # Calendar/scheduling
-│   └── ui/                  # Base UI components
-├── lib/
-│   ├── keycloak/            # Keycloak integration
-│   ├── encryption/          # PHI encryption service
-│   ├── audit/               # Audit logging
-│   └── matching/            # Matching algorithm
-├── services/                # Business logic services
-│   ├── client.service.ts
-│   ├── therapist.service.ts
-│   ├── appointment.service.ts
-│   ├── matching.service.ts
-│   └── notification.service.ts
-├── models/                  # Drizzle schemas
-│   ├── tenant.schema.ts     # Tenants & locations
-│   ├── user.schema.ts       # Users & audit logs
-│   ├── client.schema.ts     # Clients (encrypted PHI)
-│   ├── therapist.schema.ts  # Therapists
-│   ├── appointment.schema.ts# Appointments
-│   └── ...
-├── middleware/
-│   ├── tenant.middleware.ts # Tenant context injection
-│   ├── auth.middleware.ts   # Keycloak auth
-│   ├── rbac.middleware.ts   # Permission checking
-│   └── audit.middleware.ts  # Audit logging
-├── utils/
-│   ├── encryption.util.ts   # Encryption helpers
-│   └── date.util.ts
-└── validations/             # Zod schemas
-```
-
-## Key Patterns & Conventions
-
-### Tenant Isolation
-
-**Always include tenant context in queries:**
-```typescript
-// ✅ Correct
-const clients = await db
-  .select()
-  .from(clientsTable)
-  .where(eq(clientsTable.tenantId, tenantId));
-
-// ❌ Wrong - will fail RLS policy
-const clients = await db.select().from(clientsTable);
-```
-
-**Tenant middleware sets context:**
-```typescript
-// Extracted from Keycloak JWT
-const tenantId = token.tenant_id;
-await db.execute(sql`SET LOCAL app.current_tenant = ${tenantId}`);
-```
-
-### PHI Encryption
-
-**Always encrypt PHI fields before storing:**
-```typescript
-import { encryptionService } from '@/lib/encryption';
-
-const client = await db.insert(clients).values({
-  tenantId,
-  firstName: encryptionService.encrypt(data.firstName),
-  lastName: encryptionService.encrypt(data.lastName),
-  dateOfBirth: encryptionService.encrypt(data.dateOfBirth),
-  // Non-PHI fields stored as-is
-  ageGroup: data.ageGroup,
-});
-```
-
-**Decrypt when reading:**
-```typescript
-const client = await getClient(clientId);
-const decrypted = {
-  ...client,
-  firstName: encryptionService.decrypt(client.firstName),
-  lastName: encryptionService.decrypt(client.lastName),
-};
-```
-
-### Audit Logging
-
-**PHI access is auto-logged via middleware, but can also log manually:**
-```typescript
-import { logAudit } from '@/lib/audit';
-
-await logAudit({
-  tenantId,
-  userId,
-  action: 'update',
-  resource: 'client',
-  resourceId: clientId,
-  phiAccessed: true,
-  changes: { field: 'status', from: 'intake', to: 'active' },
-});
-```
-
-### RBAC Permission Checking
-
-```typescript
-import { checkPermission } from '@/middleware/rbac.middleware';
-
-// Check in API route
-if (!checkPermission(userRole, 'clients', 'update', clientId, userId)) {
-  return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-}
-
-// Use in UI
-{canUpdate && <EditButton />}
-```
-
-### Matching Algorithm
-
-**Located in `services/matching.service.ts`:**
-```typescript
-const matches = await matchingService.calculateMatches(tenantId, {
-  requiredSpecializations: [
-    { specializationId, specializationName: 'ABA', importance: 'critical' }
-  ],
-  communicationNeeds: 'non-verbal',
-  ageGroup: 'early_childhood',
-  preferredTimes: [/* ... */],
-  urgency: 'standard',
-}, therapists);
-
-// Returns top 5 matches with scores and reasoning
-```
-
-**Scoring weights:**
-- Specializations: 40%
-- Communication: 30%
-- Availability: 15%
-- Age Match: 10%
-- Schedule: 5%
-
-## Environment Variables
-
-See `.env.example` for required variables. Key ones:
-
-```bash
-DATABASE_URL                  # PostgreSQL connection
-REDIS_URL                     # Redis connection
-KEYCLOAK_URL                  # Keycloak server
-KEYCLOAK_CLIENT_SECRET        # From Keycloak admin
-AWS_KMS_KEY_ID               # For PHI encryption
-SENDGRID_API_KEY             # Email notifications
-TWILIO_AUTH_TOKEN            # SMS reminders
-SENTRY_DSN                   # Error monitoring
-```
-
-## HIPAA Compliance Notes
-
-### DO
-- ✅ Always encrypt PHI fields before storing
-- ✅ Log all PHI access (automatically via middleware)
-- ✅ Use RBAC to limit access (principle of least privilege)
-- ✅ Set tenant context for every query
-- ✅ Validate user permissions before operations
-- ✅ Use SSL/TLS for all connections
-- ✅ Implement session timeout (15 min)
-
-### DON'T
-- ❌ Never log PHI in plain text (Sentry, CloudWatch)
-- ❌ Never expose PHI in URLs or query params
-- ❌ Never skip tenant isolation checks
-- ❌ Never store unencrypted PHI
-- ❌ Never bypass audit logging
-- ❌ Never share encryption keys in code
-
-## Common Tasks
-
-### Adding a New Entity
-
-1. Create schema in `src/models/entity.schema.ts`:
-```typescript
-export const entities = pgTable('entities', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
-  // ... other fields
-});
-```
-
-2. Add RLS policy in migration:
-```sql
-CREATE POLICY tenant_isolation_policy ON entities
-  USING (tenant_id = current_setting('app.current_tenant')::uuid);
-```
-
-3. Create service in `src/services/entity.service.ts`
-4. Create API routes in `src/app/api/entities/`
-5. Create UI components in `src/components/entities/`
-6. Add validation schema in `src/validations/entity.validation.ts`
-
-### Adding a New API Route
-
-```typescript
-// src/app/api/clients/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { logAudit } from '@/lib/audit';
-import { withAuth } from '@/middleware/auth.middleware';
-import { checkPermission } from '@/middleware/rbac.middleware';
-
-export const GET = withAuth(async (req: NextRequest) => {
-  const { userId, userRole, tenantId } = req.auth;
-
-  if (!checkPermission(userRole, 'clients', 'read')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  const clients = await db
-    .select()
-    .from(clientsTable)
-    .where(eq(clientsTable.tenantId, tenantId));
-
-  // Decrypt PHI fields
-  const decrypted = clients.map(c => ({
-    ...c,
-    firstName: encryptionService.decrypt(c.firstName),
-    // ...
-  }));
-
-  await logAudit({
-    tenantId,
-    userId,
-    action: 'read',
-    resource: 'clients',
-    phiAccessed: true,
-  });
-
-  return NextResponse.json(decrypted);
-});
-```
-
-## Testing Guidelines
-
-### Unit Tests
-- Test business logic in services
-- Mock database calls
-- Test matching algorithm scoring
-- Test encryption/decryption
-
-### Integration Tests
-- Test full workflows (intake → match → schedule)
-- Test tenant isolation (cross-tenant access blocked)
-- Test RBAC permissions
-- Test audit logging
-
-### E2E Tests
-- Test complete user journeys
-- Test multi-step forms
-- Test calendar interactions
-- Test role-specific UIs
-
-## Visual Development
-
-### Design Principles
-- Comprehensive design checklist in `/context/design-principles.md`
-- Brand style guide in `/context/style-guide.md`
-- When making visual (front-end, UI/UX) changes, always refer to these files for guidance
-
-### Quick Visual Check
-IMMEDIATELY after implementing any front-end change:
-1. **Identify what changed** - Review the modified components/pages
-2. **Navigate to affected pages** - Use `mcp__playwright__browser_navigate` to visit each changed view
-3. **Verify design compliance** - Compare against `/context/design-principles.md` and `/context/style-guide.md`
-4. **Validate feature implementation** - Ensure the change fulfills the user's specific request
-5. **Check acceptance criteria** - Review any provided context files or requirements
-6. **Capture evidence** - Take full page screenshot at desktop viewport (1440px) of each changed view
-7. **Check for errors** - Run `mcp__playwright__browser_console_messages`
-
-This verification ensures changes meet design standards and user requirements.
-
-### Comprehensive Design Review
-Invoke the `design-reviewer` subagent via the Task tool for thorough design validation when:
-- Completing significant UI/UX features
-- Before finalizing PRs with visual changes
-- Needing comprehensive accessibility and responsiveness testing
-
-## Deployment
-
-See `infrastructure/terraform/` for AWS infrastructure as code.
-
-**Deploy steps:**
-1. Build Docker image: `docker build -t therapy-clinic-app .`
-2. Push to ECR: `docker push ...`
-3. Update ECS task definition
-4. Run migrations: `npm run db:migrate`
-5. Monitor CloudWatch logs
-
-## Documentation
-
-- **Full Implementation Plan:** See `IMPLEMENTATION_PLAN.md`
-- **API Documentation:** See `docs/API.md` (TBD)
-- **HIPAA Compliance:** See `docs/HIPAA_COMPLIANCE.md` (TBD)
-- **Security:** See `docs/SECURITY.md` (TBD)
-
-## Support
-
-- **GitHub Issues:** Track bugs and features
-- **Project Board:** See GitHub Projects for sprint planning
-- **Architecture Questions:** Refer to IMPLEMENTATION_PLAN.md Section 2-3
-
 ## Worktree Awareness (Optional)
 
-**Parallel Workflow System:** This project supports running multiple Claude Code sessions in parallel using git worktrees.
+**Parallel Workflow System:** Supports multiple Claude Code sessions via git worktrees.
 
 ### Detection
 
 Check for `.worktree-config.json` at project root:
-- **If found** → You're in a worktree (parallel workflow mode)
-- **If not found** → Standard single-session workflow (no changes)
+- **If found** → Worktree mode (parallel workflow)
+- **If not found** → Standard single-session workflow
 
 ### Worktree Configuration
-
-When `.worktree-config.json` exists, read it to understand context:
 
 ```json
 {
@@ -627,108 +380,42 @@ When `.worktree-config.json` exists, read it to understand context:
 
 ### Behavioral Adjustments
 
-**When in a worktree, make these passive adjustments:**
+**When in a worktree:**
 
-1. **Dev Server Port**
-   - Read PORT from `.env.local` file
-   - Use this port for `npm run dev` instead of default 3000
-   - Example: `[dev-1]` uses port 3001, `[dev-2]` uses port 3002
-
-2. **Response Prefixes**
-   - Prefix responses with worktree name: `[dev-1] Working on issue #42...`
-   - Helps user track which session is speaking
-
-3. **Testing Strategy**
-   - **Development worktrees (dev-1, dev-2)**: Quick checks only
-     - Run type checks before commits
-     - Suggest ci-cd worktree for full test suites
-     - Example: "For comprehensive testing, use ci-cd worktree (or run here if preferred)"
-   - **PR Review worktree (pr-review)**: Light testing only
-     - Focus on reviewing changes
-     - Test functionality if needed for review
-   - **CI/CD worktree (ci-cd)**: Comprehensive testing
-     - Run full test suites with coverage
-     - Handle database migrations
-     - Generate coverage reports
-
-4. **Role Guidelines**
-   - Read `guidelines` from config
-   - Follow role-specific recommendations
-   - Maintain awareness of worktree purpose
+1. **Dev Server Port** - Read PORT from `.env.local`, use for `npm run dev`
+2. **Response Prefixes** - Prefix with worktree name: `[dev-1] Working on issue #42...`
+3. **Testing Strategy:**
+   - **dev-1, dev-2:** Quick checks only, suggest ci-cd for full suites
+   - **pr-review:** Light testing, focus on review
+   - **ci-cd:** Comprehensive testing, full coverage
+4. **Role Guidelines** - Follow `guidelines` from config
 
 ### Worktree Coordination (Preventing Duplicate Work)
 
-**Issue Assignment Tracking:** To prevent multiple worktrees from working on the same issue, the system tracks assignments in `.worktree-assignments.json`.
+**Before starting work (`/work-issue N`):**
 
-**Before starting work on an issue (`/work-issue N`):**
-
-1. **Check if issue is already assigned:**
-   ```bash
-   ASSIGNED_TO=$(./.claude/scripts/worktree-check-assignment.sh N)
-   if [ $? -eq 1 ]; then
-     # Issue is assigned to $ASSIGNED_TO
-     echo "Warning: Issue #N is already being worked on in $ASSIGNED_TO"
-     # Ask user if they want to continue anyway
-   fi
-   ```
-
-2. **If not assigned, assign to current worktree:**
-   ```bash
-   # Get current worktree name from .worktree-config.json
-   WORKTREE_NAME=$(jq -r '.name' .worktree-config.json)
-   ./.claude/scripts/worktree-assign.sh $WORKTREE_NAME N
-   ```
-
-3. **Proceed with normal `/work-issue` workflow**
-
-**Example interaction:**
-```
-User: /work-issue 42
-Claude: [dev-1] Checking if issue #42 is already assigned...
-Claude: [dev-1] ⚠️  Issue #42 is already being worked on in dev-2
-Claude: [dev-1]
-Claude: [dev-1] Options:
-Claude: [dev-1] 1. Work on a different issue (recommended)
-Claude: [dev-1] 2. Continue anyway (will cause git conflicts)
-Claude: [dev-1]
-Claude: [dev-1] Would you like me to suggest a different issue?
-```
-
-**After completing an issue (`/complete-issue N`):**
-
-1. **Unassign issue from current worktree:**
-   ```bash
-   WORKTREE_NAME=$(jq -r '.name' .worktree-config.json)
-   ./.claude/scripts/worktree-unassign.sh $WORKTREE_NAME N
-   ```
-
-2. **Check if other worktrees have the same branch checked out:**
-   ```bash
-   # Check git worktree list for the branch
-   BRANCH="pk/issue-N-description"
-   OTHER_WORKTREES=$(git worktree list | grep "$BRANCH" | grep -v "$(pwd)")
-
-   if [ -n "$OTHER_WORKTREES" ]; then
-     echo "⚠️  Branch $BRANCH is still checked out in other worktrees:"
-     echo "$OTHER_WORKTREES"
-     echo ""
-     echo "Those worktrees should be reset or switched to a different branch."
-   fi
-   ```
-
-3. **Proceed with normal `/complete-issue` workflow**
-
-**Checking assignments:**
-
+1. Check if issue assigned:
 ```bash
-# View all assignments
-cat .worktree-assignments.json
-
-# Or use the list script (shows assignments automatically)
-./.claude/scripts/worktree-list.sh
+ASSIGNED_TO=$(./.claude/scripts/worktree-check-assignment.sh N)
+if [ $? -eq 1 ]; then
+  echo "Warning: Issue #N is already being worked on in $ASSIGNED_TO"
+  # Ask user if they want to continue
+fi
 ```
 
-**Assignment file format:**
+2. If not assigned, assign to current worktree:
+```bash
+WORKTREE_NAME=$(jq -r '.name' .worktree-config.json)
+./.claude/scripts/worktree-assign.sh $WORKTREE_NAME N
+```
+
+**After completing (`/complete-issue N`):**
+
+1. Unassign from current worktree
+2. Check if other worktrees have same branch
+3. Proceed with normal workflow
+
+**Assignment file (`.worktree-assignments.json`):**
 ```json
 {
   "dev-1": 42,
@@ -739,24 +426,17 @@ cat .worktree-assignments.json
 ```
 
 **Key behaviors:**
-- ✅ **Assignment is advisory** - Git will still prevent same branch checkout (hard protection)
-- ✅ **Check before starting work** - Warn user of conflicts
-- ✅ **Auto-cleanup on completion** - Remove assignment when issue done
-- ✅ **Safe failures** - If coordination fails, git branch protection still works
+- ✅ Assignment is advisory (git branch protection is hard protection)
+- ✅ Check before starting work
+- ✅ Auto-cleanup on completion
+- ✅ Safe failures (git still prevents conflicts)
 
 ### Commands Compatibility
 
-**ALL existing commands work identically in worktrees:**
-- `/work-issue N` - Creates branch, works normally
-- `/complete-issue N` - Merges PR, updates board
-- `/suggest-next-issue` - Analyzes, suggests next
-- `/review-pr N` - Reviews pull request
-- `/type-check` - Runs type checking
-- `/hipaa-check` - Runs HIPAA audit
-- `/verify-app` - Verifies app runs
-- `npm run dev` - Uses PORT from .env.local
-
-**No workflow changes needed.** Worktrees are a transparent enhancement.
+**ALL commands work identically in worktrees:**
+- `/work-issue N`, `/complete-issue N`, `/suggest-next-issue`
+- `/review-pr N`, `/type-check`, `/hipaa-check`, `/verify-app`
+- `npm run dev` (uses PORT from .env.local)
 
 ### Worktree Roles
 
@@ -769,7 +449,7 @@ cat .worktree-assignments.json
 
 ### Example Behavior
 
-**Main directory (no config):**
+**Main directory:**
 ```
 You: /work-issue 42
 Claude: Creating branch pk/issue-42-client-intake...
@@ -784,32 +464,14 @@ Claude: [dev-1] Starting dev server on port 3001...
 Claude: [dev-1] For full test suite, use ci-cd worktree
 ```
 
-**In ci-cd worktree:**
-```
-You: Run full tests
-Claude: [ci-cd] Running comprehensive test suite...
-Claude: [ci-cd] ✓ Unit tests: 150 passed
-Claude: [ci-cd] ✓ Type check: No errors
-Claude: [ci-cd] ✓ Coverage: 85%
-```
-
 ### Management
 
-**Setup** (one-time):
 ```bash
-./.claude/scripts/worktree-init.sh
+./.claude/scripts/worktree-init.sh        # Setup (one-time)
+./.claude/scripts/worktree-list.sh        # Check status
 ```
 
-**Check status** (anytime):
-```bash
-/worktree-status
-# or
-./.claude/scripts/worktree-list.sh
-```
-
-**Documentation**:
-- Complete guide: `.claude/docs/WORKTREE_GUIDE.md`
-- Management scripts: `.claude/scripts/worktree-*.sh`
+**Documentation:** `.claude/docs/WORKTREE_GUIDE.md`
 
 ### Key Points
 
@@ -819,6 +481,5 @@ Claude: [ci-cd] ✓ Coverage: 85%
 - ✅ Enables 4 parallel Claude sessions
 - ✅ Shared database, Redis, git repository
 - ✅ Independent node_modules, builds, dev servers
-- ✅ Easy to remove if not needed
 
-**If you're not in a worktree, ignore this entire section.** Everything works as before.
+**If not in a worktree, ignore this section.**
