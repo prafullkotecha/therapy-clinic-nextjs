@@ -212,6 +212,49 @@ npm run db:migrate
 
 There is no need to restart the Next.js server for the changes to take effect.
 
+### Seed database with demo data
+
+The project includes a comprehensive seed script that populates the database with realistic demo data for development and testing. The seed data includes:
+
+- 1 clinic organization (tenant) with 2 locations
+- 27 therapy specializations across all categories
+- 6 users (1 admin, 3 therapists, 1 billing, 1 receptionist)
+- 8 clients with varied profiles and encrypted PHI
+- Client needs with specialization requirements
+- 15 appointments (past, upcoming, and cancelled)
+
+To seed the database, run:
+
+```shell
+npm run db:seed
+```
+
+You'll be prompted for confirmation before the existing data is cleared. To skip the prompt (useful for automated scripts), use:
+
+```shell
+npm run db:seed -- --force
+```
+
+Or use the reset command to clear and reseed in one step:
+
+```shell
+npm run db:reset
+```
+
+**Demo Accounts:**
+
+After seeding, you can use these accounts for testing (requires Keycloak setup):
+
+- **Admin:** admin@brightfutures.test
+- **Therapists:**
+  - dr.sarah.johnson@brightfutures.test (ABA/Autism specialist)
+  - michael.chen@brightfutures.test (CBT/Anxiety specialist)
+  - emma.rodriguez@brightfutures.test (Trauma/EMDR specialist)
+- **Billing:** lisa.anderson@brightfutures.test
+- **Receptionist:** james.wilson@brightfutures.test
+
+**Note:** All PHI (Protected Health Information) fields are encrypted using AES-256-GCM encryption. The seed script automatically handles encryption, so decrypted values will only be visible through the application UI or when using the encryption service.
+
 ### Commit Message Format
 
 The project follows the [Conventional Commits](https://www.conventionalcommits.org/) specification, meaning all commit messages must be formatted accordingly. To help you write commit messages, the project provides an interactive CLI that guides you through the commit process. To use it, run the following command:
