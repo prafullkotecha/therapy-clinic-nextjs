@@ -102,7 +102,7 @@ export function AdminTherapistsView() {
       }
       if (specializationsRes.ok) {
         const specializationsData = await specializationsRes.json();
-        setSpecializations(specializationsData.filter((s: Specialization) => s.description !== null));
+        setSpecializations(specializationsData);
       }
     } catch (err) {
       console.error('Failed to fetch reference data:', err);

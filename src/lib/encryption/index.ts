@@ -53,19 +53,40 @@ export async function getEncryptionService(): Promise<PHIEncryptionService> {
 }
 
 /**
- * Synchronous encryption service getter
+ * Synchronous encryption service getter with lazy initialization
  *
- * WARNING: Only use this after the service has been initialized.
- * Call `await getEncryptionService()` first during app startup.
+ * Auto-initializes the service on first use if not already initialized.
+ * Note: Initialization is synchronous but reads from environment variables.
  *
- * @throws Error if service hasn't been initialized yet
+ * @throws Error if required environment variables are missing
  */
 export function getEncryptionServiceSync(): PHIEncryptionService {
   if (!encryptionServiceInstance) {
-    throw new Error(
-      'Encryption service not initialized. '
-      + 'Call `await getEncryptionService()` during app startup.',
-    );
+    // Lazy initialization - create service synchronously
+    const kmsService = createKMSService();
+
+    // Note: getDataKey() is async, but we can make it sync by reading env directly
+    const key = process.env.PHI_ENCRYPTION_KEY;
+    if (!key) {
+      throw new Error(
+        'PHI_ENCRYPTION_KEY environment variable is required. '
+        + 'Generate with: openssl rand -hex 32',
+      );
+    }
+
+    // Validate key length (64 hex chars = 32 bytes = 256 bits)
+    if (key.length !== 64) {
+      throw new Error(
+        'PHI_ENCRYPTION_KEY must be 64 hex characters (32 bytes). '
+        + 'Generate with: openssl rand -hex 32',
+      );
+    }
+
+    // eslint-disable-next-line node/prefer-global/buffer
+    const dataKey = Buffer.from(key, 'hex');
+    const keyId = kmsService.getKeyId();
+
+    encryptionServiceInstance = new PHIEncryptionService(dataKey, keyId);
   }
   return encryptionServiceInstance;
 }
