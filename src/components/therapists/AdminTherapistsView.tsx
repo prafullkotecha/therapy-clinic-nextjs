@@ -358,7 +358,17 @@ export function AdminTherapistsView() {
                     languages: (editingTherapist.languages as string[]) || ['English'],
                     ageGroupExpertise: (editingTherapist.ageGroupExpertise as Array<'early_childhood' | 'school_age' | 'adolescent' | 'adult'>) || [],
                     communicationExpertise: (editingTherapist.communicationExpertise as Array<'non-verbal' | 'aac' | 'sign_language' | 'speech_integration'>) || [],
-                    availability: editingTherapist.availability as any,
+                    availability: editingTherapist.availability && typeof editingTherapist.availability === 'object'
+                      ? editingTherapist.availability
+                      : {
+                          monday: [],
+                          tuesday: [],
+                          wednesday: [],
+                          thursday: [],
+                          friday: [],
+                          saturday: [],
+                          sunday: [],
+                        },
                     specializations: editingTherapist.specializations?.map(s => ({
                       specializationId: s.specializationId,
                       proficiencyLevel: s.proficiencyLevel as 'expert' | 'proficient' | 'familiar',

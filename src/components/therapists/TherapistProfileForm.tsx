@@ -82,7 +82,9 @@ export function TherapistProfileForm({
     (initialData?.communicationExpertise as Array<'non-verbal' | 'aac' | 'sign_language' | 'speech_integration'>) || [],
   );
   const [availability, setAvailability] = useState<WeeklyAvailability>(
-    (initialData?.availability as WeeklyAvailability) || defaultAvailability,
+    initialData?.availability && typeof initialData.availability === 'object'
+      ? (initialData.availability as WeeklyAvailability)
+      : defaultAvailability,
   );
   const [selectedSpecializations, setSelectedSpecializations] = useState<
     Array<{ specializationId: string; proficiencyLevel: 'expert' | 'proficient' | 'familiar'; yearsExperience: number | null }>
@@ -604,7 +606,7 @@ export function TherapistProfileForm({
                 </Button>
               </div>
               <div className="space-y-2">
-                {availability[day].map((slot, index) => (
+                {(availability[day] || []).map((slot, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <input
                       type="time"
