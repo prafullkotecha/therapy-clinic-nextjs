@@ -30,8 +30,9 @@ export async function setTenantContext(
   }
 
   // Set the PostgreSQL session variable for RLS policies
-  // Using ::uuid cast allows PostgreSQL to accept parameterized query
-  await db.execute(sql`SET LOCAL app.current_tenant = ${tenantId}::uuid`);
+  // Note: SET LOCAL doesn't support parameterized queries or type casts
+  // UUID is validated above, so we can safely use the string value directly
+  await db.execute(sql.raw(`SET LOCAL app.current_tenant = '${tenantId}'`));
 }
 
 /**
