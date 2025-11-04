@@ -23,6 +23,11 @@ import { logAudit } from '@/services/audit.service';
  * IMPORTANT: All PHI fields must be encrypted before storage and decrypted after retrieval
  */
 
+// Constants for time calculations
+const MILLISECONDS_PER_MINUTE = 60 * 1000;
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+const TIME_STRING_FORMAT_LENGTH = 5; // HH:MM
+
 export type AppointmentWithDetails = {
   id: string;
   tenantId: string;
@@ -496,25 +501,201 @@ export async function rescheduleAppointment(
 }
 
 /**
+ * Helper: Check if two time slots overlap
+ */
+function slotsOverlap(
+  start1: string,
+  end1: string,
+  start2: string,
+  end2: string,
+): boolean {
+  // Slots overlap if start1 < end2 AND start2 < end1
+  return start1 < end2 && start2 < end1;
+}
+
+/**
+ * Helper: Generate time slots from a time range
+ */
+function generateSlotsFromTimeRange(
+  startTime: string,
+  endTime: string,
+  slotDuration: number,
+  date: string,
+): Array<{ startTime: string; endTime: string }> {
+  const slots: Array<{ startTime: string; endTime: string }> = [];
+
+  // Parse start and end times (format: HH:MM)
+  const [startHour, startMinute] = startTime.split(':').map(Number);
+  const [endHour, endMinute] = endTime.split(':').map(Number);
+
+  if (
+    startHour === undefined
+    || startMinute === undefined
+    || endHour === undefined
+    || endMinute === undefined
+  ) {
+    return slots;
+  }
+
+  // Create date objects for calculation
+  let currentSlotStart = new Date(`${date}T${startTime}:00`);
+  const rangeEnd = new Date(`${date}T${endTime}:00`);
+
+  // Generate slots
+  while (currentSlotStart < rangeEnd) {
+    const slotEnd = new Date(currentSlotStart.getTime() + slotDuration * MILLISECONDS_PER_MINUTE);
+
+    // Only add if slot end doesn't exceed range end
+    if (slotEnd <= rangeEnd) {
+      const startStr = currentSlotStart.toTimeString().slice(0, TIME_STRING_FORMAT_LENGTH);
+      const endStr = slotEnd.toTimeString().slice(0, TIME_STRING_FORMAT_LENGTH);
+
+      slots.push({
+        startTime: startStr,
+        endTime: endStr,
+      });
+    }
+
+    // Move to next slot
+    currentSlotStart = new Date(currentSlotStart.getTime() + slotDuration * MILLISECONDS_PER_MINUTE);
+  }
+
+  return slots;
+}
+
+/**
  * Get available time slots for a therapist on a given date
+ * Generates slots from effective availability, excluding booked appointments
  */
 export async function getAvailableSlots(
   tenantId: string,
-  _therapistId: string,
-  _date: string,
-  _slotDuration: number = DEFAULT_APPOINTMENT_DURATION_MINUTES,
+  therapistId: string,
+  date: string,
+  slotDuration: number = DEFAULT_APPOINTMENT_DURATION_MINUTES,
 ): Promise<AvailableSlot[]> {
   return withTenantContext(tenantId, async () => {
-    // TODO: Implement slot generation logic
-    // This is a placeholder implementation
-    // Full implementation requires:
-    // 1. Get therapist's scheduled appointments for the date
-    // 2. Get therapist details for availability template
-    // 3. Parse availability template from therapist.availability
-    // 4. Check therapistAvailability for overrides
-    // 5. Generate available slots based on availability and booked slots
+    // Import availability service functions
+    const { getEffectiveAvailability } = await import('@/services/availability.service');
 
-    return [];
+    // Get effective availability for the date
+    const dayAvailability = await getEffectiveAvailability(tenantId, therapistId, date);
+
+    if (!dayAvailability.isAvailable || dayAvailability.timeSlots.length === 0) {
+      return [];
+    }
+
+    // Get booked appointments for this therapist on this date
+    const bookedAppointments = await db
+      .select()
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.tenantId, tenantId),
+          eq(appointments.therapistId, therapistId),
+          eq(appointments.appointmentDate, date),
+          or(
+            eq(appointments.status, 'scheduled'),
+            eq(appointments.status, 'checked-in'),
+            eq(appointments.status, 'confirmed'),
+          ),
+        ),
+      );
+
+    // Get therapist details for name and location
+    const { therapists } = await import('@/models/therapist.schema');
+    const { users } = await import('@/models/user.schema');
+
+    const [therapist] = await db
+      .select({
+        therapist: therapists,
+        user: users,
+      })
+      .from(therapists)
+      .innerJoin(users, eq(therapists.userId, users.id))
+      .where(
+        and(
+          eq(therapists.tenantId, tenantId),
+          eq(therapists.id, therapistId),
+        ),
+      );
+
+    if (!therapist) {
+      return [];
+    }
+
+    const encryption = getEncryptionServiceSync();
+    const firstName = therapist.user.firstName ? encryption.decrypt(therapist.user.firstName) : '';
+    const lastName = therapist.user.lastName ? encryption.decrypt(therapist.user.lastName) : '';
+    const therapistName = `${firstName} ${lastName}`.trim();
+
+    // Generate slots from time slots
+    const availableSlots: AvailableSlot[] = [];
+
+    for (const timeSlot of dayAvailability.timeSlots) {
+      const slots = generateSlotsFromTimeRange(
+        timeSlot.start,
+        timeSlot.end,
+        slotDuration,
+        date,
+      );
+
+      for (const slot of slots) {
+        // Check if slot overlaps with any booked appointment
+        const isBooked = bookedAppointments.some((apt) => {
+          return slotsOverlap(
+            slot.startTime,
+            slot.endTime,
+            apt.startTime,
+            apt.endTime,
+          );
+        });
+
+        if (!isBooked) {
+          availableSlots.push({
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            therapistId,
+            therapistName,
+            locationId: therapist.therapist.primaryLocationId || '',
+          });
+        }
+      }
+    }
+
+    return availableSlots.sort((a, b) => a.startTime.localeCompare(b.startTime));
+  });
+}
+
+/**
+ * Get available slots across a date range for a therapist
+ */
+export async function getAvailableSlotsRange(
+  tenantId: string,
+  therapistId: string,
+  startDate: string,
+  endDate: string,
+  slotDuration: number = DEFAULT_APPOINTMENT_DURATION_MINUTES,
+): Promise<Record<string, AvailableSlot[]>> {
+  return withTenantContext(tenantId, async () => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const result: Record<string, AvailableSlot[]> = {};
+
+    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / MILLISECONDS_PER_DAY) + 1;
+
+    // Iterate through each day in range
+    for (let i = 0; i < daysDiff; i++) {
+      const current = new Date(start);
+      current.setDate(start.getDate() + i);
+      const dateStr = current.toISOString().split('T')[0];
+
+      if (dateStr) {
+        const slots = await getAvailableSlots(tenantId, therapistId, dateStr, slotDuration);
+        result[dateStr] = slots;
+      }
+    }
+
+    return result;
   });
 }
 
