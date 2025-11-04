@@ -12,6 +12,7 @@ import { DEFAULT_APPOINTMENT_DURATION_MINUTES } from '@/constants/appointments';
 import { getEncryptionServiceSync } from '@/lib/encryption';
 import { withTenantContext } from '@/lib/tenant-db';
 import { db } from '@/libs/DB';
+import { logger } from '@/libs/Logger';
 import { appointments, waitlist } from '@/models/appointment.schema';
 import { logAudit } from '@/services/audit.service';
 
@@ -239,6 +240,7 @@ export async function createAppointment(
   tenantId: string,
   userId: string,
   input: CreateAppointmentInput,
+  parentAppointmentId?: string,
 ): Promise<AppointmentWithDetails> {
   return withTenantContext(tenantId, async () => {
     const encryption = getEncryptionServiceSync();
@@ -267,6 +269,7 @@ export async function createAppointment(
         : null,
       createdBy: userId,
       status: 'scheduled',
+      ...(parentAppointmentId && { parentAppointmentId }),
     };
 
     const [newAppointment] = await db
@@ -637,28 +640,26 @@ export async function createRecurringAppointments(
       input.appointmentData.appointmentDate,
     );
 
-    // Collect all conflicts before creating any appointments
-    const allConflicts: Array<{
-      date: string;
-      conflicts: ConflictCheckResult['conflicts'];
-    }> = [];
-
-    for (const date of generatedDates) {
-      const conflictCheck = await checkConflicts(
-        tenantId,
-        input.appointmentData.therapistId,
+    // Collect all conflicts before creating any appointments (in parallel)
+    const conflictChecks = await Promise.all(
+      generatedDates.map(async date => ({
         date,
-        input.appointmentData.startTime,
-        input.appointmentData.endTime,
-      );
-
-      if (conflictCheck.hasConflict) {
-        allConflicts.push({
+        result: await checkConflicts(
+          tenantId,
+          input.appointmentData.therapistId,
           date,
-          conflicts: conflictCheck.conflicts,
-        });
-      }
-    }
+          input.appointmentData.startTime,
+          input.appointmentData.endTime,
+        ),
+      })),
+    );
+
+    const allConflicts = conflictChecks
+      .filter(({ result }) => result.hasConflict)
+      .map(({ date, result }) => ({
+        date,
+        conflicts: result.conflicts,
+      }));
 
     // If conflicts found, throw error with details
     if (allConflicts.length > 0) {
@@ -676,20 +677,19 @@ export async function createRecurringAppointments(
     // Create child appointments
     const childAppointmentPromises = generatedDates.map(async (date) => {
       try {
-        const childAppointment = await createAppointment(tenantId, userId, {
-          ...input.appointmentData,
-          appointmentDate: date,
-          isRecurring: false,
-          recurrencePattern: undefined,
-        });
+        const childAppointment = await createAppointment(
+          tenantId,
+          userId,
+          {
+            ...input.appointmentData,
+            appointmentDate: date,
+            isRecurring: false,
+            recurrencePattern: undefined,
+          },
+          parentAppointment.id, // Pass parentAppointmentId directly
+        );
 
-        // Link to parent
-        await db
-          .update(appointments)
-          .set({ parentAppointmentId: parentAppointment.id })
-          .where(eq(appointments.id, childAppointment.id));
-
-        return { ...childAppointment, parentAppointmentId: parentAppointment.id };
+        return childAppointment;
       } catch (error) {
         // Return error info for partial failure handling
         return {
@@ -717,7 +717,7 @@ export async function createRecurringAppointments(
       const failureDetails = failed
         .map(f => `${f.date}: ${f.message}`)
         .join('; ');
-      console.warn(
+      logger.warn(
         `Partial failure creating recurring appointments: ${failureDetails}`,
       );
 
