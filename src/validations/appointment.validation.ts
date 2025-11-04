@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  MAX_APPOINTMENT_DURATION_MINUTES,
+  MIN_APPOINTMENT_DURATION_MINUTES,
+} from '@/constants/appointments';
 
 /**
  * Appointment status options
@@ -65,7 +69,11 @@ export const CreateAppointmentSchema = z.object({
   appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD
   startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/), // HH:MM or HH:MM:SS
   endTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
-  duration: z.number().int().min(15).max(480), // 15 min to 8 hours
+  duration: z
+    .number()
+    .int()
+    .min(MIN_APPOINTMENT_DURATION_MINUTES)
+    .max(MAX_APPOINTMENT_DURATION_MINUTES),
   appointmentType: z.enum([
     'initial_assessment',
     'regular_session',
@@ -88,7 +96,12 @@ export const UpdateAppointmentSchema = z.object({
   appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
   endTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
-  duration: z.number().int().min(15).max(480).optional(),
+  duration: z
+    .number()
+    .int()
+    .min(MIN_APPOINTMENT_DURATION_MINUTES)
+    .max(MAX_APPOINTMENT_DURATION_MINUTES)
+    .optional(),
   appointmentType: z
     .enum([
       'initial_assessment',

@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  DEFAULT_APPOINTMENT_DURATION_MINUTES,
+  MAX_APPOINTMENT_DURATION_MINUTES,
+  MIN_APPOINTMENT_DURATION_MINUTES,
+} from '@/constants/appointments';
 
 /**
  * Availability type options
@@ -112,7 +117,12 @@ export type AvailabilityQueryParams = z.infer<
 export const GetAvailableSlotsSchema = z.object({
   therapistId: z.string().uuid(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  slotDuration: z.number().int().min(15).max(480).default(60), // minutes
+  slotDuration: z
+    .number()
+    .int()
+    .min(MIN_APPOINTMENT_DURATION_MINUTES)
+    .max(MAX_APPOINTMENT_DURATION_MINUTES)
+    .default(DEFAULT_APPOINTMENT_DURATION_MINUTES),
 });
 
 export type GetAvailableSlotsInput = z.infer<typeof GetAvailableSlotsSchema>;

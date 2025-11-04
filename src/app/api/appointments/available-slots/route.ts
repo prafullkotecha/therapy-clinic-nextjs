@@ -1,5 +1,10 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import {
+  DEFAULT_APPOINTMENT_DURATION_MINUTES,
+  MAX_APPOINTMENT_DURATION_MINUTES,
+  MIN_APPOINTMENT_DURATION_MINUTES,
+} from '@/constants/appointments';
 import { getAuthContext } from '@/lib/auth-helpers';
 import { getAvailableSlots } from '@/services/appointment.service';
 
@@ -24,7 +29,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const { searchParams } = new URL(request.url);
     const therapistId = searchParams.get('therapistId');
     const date = searchParams.get('date');
-    const duration = Number.parseInt(searchParams.get('duration') || '60', 10);
+    const duration = Number.parseInt(
+      searchParams.get('duration') || String(DEFAULT_APPOINTMENT_DURATION_MINUTES),
+      10,
+    );
 
     if (!therapistId || !date) {
       return NextResponse.json(
@@ -42,9 +50,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     // Validate duration
-    if (Number.isNaN(duration) || duration < 15 || duration > 480) {
+    if (
+      Number.isNaN(duration)
+      || duration < MIN_APPOINTMENT_DURATION_MINUTES
+      || duration > MAX_APPOINTMENT_DURATION_MINUTES
+    ) {
       return NextResponse.json(
-        { error: 'Invalid duration. Must be between 15 and 480 minutes' },
+        {
+          error: `Invalid duration. Must be between ${MIN_APPOINTMENT_DURATION_MINUTES} and ${MAX_APPOINTMENT_DURATION_MINUTES} minutes`,
+        },
         { status: 400 },
       );
     }

@@ -7,6 +7,7 @@ import type {
   UpdateAppointmentInput,
 } from '@/validations/appointment.validation';
 import { and, eq, gte, lte, or, sql } from 'drizzle-orm';
+import { DEFAULT_APPOINTMENT_DURATION_MINUTES } from '@/constants/appointments';
 import { getEncryptionServiceSync } from '@/lib/encryption';
 import { withTenantContext } from '@/lib/tenant-db';
 import { db } from '@/libs/DB';
@@ -494,7 +495,7 @@ export async function getAvailableSlots(
   tenantId: string,
   _therapistId: string,
   _date: string,
-  _slotDuration: number = 60, // minutes
+  _slotDuration: number = DEFAULT_APPOINTMENT_DURATION_MINUTES,
 ): Promise<AvailableSlot[]> {
   return withTenantContext(tenantId, async () => {
     // TODO: Implement slot generation logic
@@ -550,7 +551,7 @@ export async function addToWaitlist(
   preferredDates?: string[],
   preferredTimes?: string[],
   priority: 'standard' | 'urgent' = 'standard',
-) {
+): Promise<typeof waitlist.$inferSelect> {
   return withTenantContext(tenantId, async () => {
     const [newEntry] = await db
       .insert(waitlist)

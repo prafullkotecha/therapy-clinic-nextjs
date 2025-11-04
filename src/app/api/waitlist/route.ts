@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth-helpers';
 import { withTenantContext } from '@/lib/tenant-db';
@@ -29,7 +29,11 @@ export async function GET(_request: NextRequest): Promise<NextResponse> {
     // This pattern is used throughout the codebase (see appointment.service.ts)
     // Provides extra safety if RLS policies are misconfigured or disabled
     const waitlistEntries = await withTenantContext(tenantId, async () => {
-      return db.select().from(waitlist).where(eq(waitlist.tenantId, tenantId));
+      return db
+        .select()
+        .from(waitlist)
+        .where(eq(waitlist.tenantId, tenantId))
+        .orderBy(desc(waitlist.priority), asc(waitlist.addedAt));
     });
 
     return NextResponse.json(waitlistEntries);
