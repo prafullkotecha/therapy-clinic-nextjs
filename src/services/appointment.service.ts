@@ -7,6 +7,7 @@ import type {
   RescheduleAppointmentInput,
   UpdateAppointmentInput,
 } from '@/validations/appointment.validation';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { and, eq, gte, lte, or, sql } from 'drizzle-orm';
 import { DEFAULT_APPOINTMENT_DURATION_MINUTES } from '@/constants/appointments';
 import { getEncryptionServiceSync } from '@/lib/encryption';
@@ -14,6 +15,7 @@ import { withTenantContext } from '@/lib/tenant-db';
 import { db } from '@/libs/DB';
 import { logger } from '@/libs/Logger';
 import { appointments, waitlist } from '@/models/appointment.schema';
+import { locations } from '@/models/tenant.schema';
 import { therapists } from '@/models/therapist.schema';
 import { users } from '@/models/user.schema';
 import { logAudit } from '@/services/audit.service';
@@ -29,7 +31,50 @@ import { getEffectiveAvailability } from '@/services/availability.service';
 // Constants for time calculations
 const MILLISECONDS_PER_MINUTE = 60 * 1000;
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
-const TIME_STRING_FORMAT_LENGTH = 5; // HH:MM
+
+/**
+ * Parse date and time in a specific timezone and return UTC Date object
+ * @param date - Date string in format YYYY-MM-DD
+ * @param time - Time string in format HH:MM
+ * @param timezone - IANA timezone identifier (e.g., 'America/New_York')
+ * @returns Date object representing the time in UTC
+ */
+function parseTimeInZone(date: string, time: string, timezone: string): Date {
+  // Validate time format with regex (HH:MM or H:MM or HH:M or H:M)
+  const timeRegex = /^\d{1,2}:\d{1,2}$/;
+  if (!timeRegex.test(time)) {
+    throw new Error(`Invalid time format: ${time}`);
+  }
+
+  const [hours, minutes] = time.split(':').map(Number);
+
+  if (
+    hours === undefined
+    || minutes === undefined
+    || Number.isNaN(hours)
+    || Number.isNaN(minutes)
+    || hours < 0
+    || hours > 23
+    || minutes < 0
+    || minutes > 59
+  ) {
+    throw new Error(`Invalid time format: ${time}`);
+  }
+
+  const dateTimeStr = `${date} ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
+
+  return fromZonedTime(dateTimeStr, timezone);
+}
+
+/**
+ * Format a Date object to HH:MM string in a specific timezone
+ * @param date - Date object to format
+ * @param timezone - IANA timezone identifier (e.g., 'America/New_York')
+ * @returns Time string in format HH:MM
+ */
+function formatTimeInZone(date: Date, timezone: string): string {
+  return formatInTimeZone(date, timezone, 'HH:mm');
+}
 
 export type AppointmentWithDetails = {
   id: string;
@@ -526,43 +571,38 @@ export function generateSlotsFromTimeRange(
   endTime: string,
   slotDuration: number,
   date: string,
+  timezone: string = 'America/New_York',
 ): Array<{ startTime: string; endTime: string }> {
   const slots: Array<{ startTime: string; endTime: string }> = [];
 
-  // Parse start and end times (format: HH:MM)
-  const [startHour, startMinute] = startTime.split(':').map(Number);
-  const [endHour, endMinute] = endTime.split(':').map(Number);
+  try {
+    // Parse date/time in the specified timezone
+    // This will throw an error for invalid time formats
+    let currentSlotStart = parseTimeInZone(date, startTime, timezone);
+    const rangeEnd = parseTimeInZone(date, endTime, timezone);
 
-  if (
-    startHour === undefined
-    || startMinute === undefined
-    || endHour === undefined
-    || endMinute === undefined
-  ) {
-    return slots;
-  }
+    // Generate slots
+    while (currentSlotStart < rangeEnd) {
+      const slotEnd = new Date(currentSlotStart.getTime() + slotDuration * MILLISECONDS_PER_MINUTE);
 
-  // Create date objects for calculation
-  let currentSlotStart = new Date(`${date}T${startTime}:00`);
-  const rangeEnd = new Date(`${date}T${endTime}:00`);
+      // Only add if slot end doesn't exceed range end
+      if (slotEnd <= rangeEnd) {
+        // Format times in the specified timezone
+        const startStr = formatTimeInZone(currentSlotStart, timezone);
+        const endStr = formatTimeInZone(slotEnd, timezone);
 
-  // Generate slots
-  while (currentSlotStart < rangeEnd) {
-    const slotEnd = new Date(currentSlotStart.getTime() + slotDuration * MILLISECONDS_PER_MINUTE);
+        slots.push({
+          startTime: startStr,
+          endTime: endStr,
+        });
+      }
 
-    // Only add if slot end doesn't exceed range end
-    if (slotEnd <= rangeEnd) {
-      const startStr = currentSlotStart.toTimeString().slice(0, TIME_STRING_FORMAT_LENGTH);
-      const endStr = slotEnd.toTimeString().slice(0, TIME_STRING_FORMAT_LENGTH);
-
-      slots.push({
-        startTime: startStr,
-        endTime: endStr,
-      });
+      // Move to next slot
+      currentSlotStart = new Date(currentSlotStart.getTime() + slotDuration * MILLISECONDS_PER_MINUTE);
     }
-
-    // Move to next slot
-    currentSlotStart = new Date(currentSlotStart.getTime() + slotDuration * MILLISECONDS_PER_MINUTE);
+  } catch {
+    // Return empty array for invalid input
+    return slots;
   }
 
   return slots;
@@ -627,6 +667,21 @@ export async function getAvailableSlots(
     const lastName = therapist.user.lastName ? encryption.decrypt(therapist.user.lastName) : '';
     const therapistName = `${firstName} ${lastName}`.trim();
 
+    // Get location timezone
+    const locationId = therapist.therapist.primaryLocationId;
+    let timezone = 'America/New_York'; // Default timezone
+
+    if (locationId) {
+      const [location] = await db
+        .select()
+        .from(locations)
+        .where(eq(locations.id, locationId));
+
+      if (location?.timezone) {
+        timezone = location.timezone;
+      }
+    }
+
     // Generate slots from time slots
     const availableSlots: AvailableSlot[] = [];
 
@@ -636,6 +691,7 @@ export async function getAvailableSlots(
         timeSlot.end,
         slotDuration,
         date,
+        timezone,
       );
 
       for (const slot of slots) {
@@ -667,6 +723,7 @@ export async function getAvailableSlots(
 
 /**
  * Get available slots across a date range for a therapist
+ * Optimized to batch database queries and avoid N+1 problems
  */
 export async function getAvailableSlotsRange(
   tenantId: string,
@@ -676,21 +733,133 @@ export async function getAvailableSlotsRange(
   slotDuration: number = DEFAULT_APPOINTMENT_DURATION_MINUTES,
 ): Promise<Record<string, AvailableSlot[]>> {
   return withTenantContext(tenantId, async () => {
+    // 1. Fetch therapist details ONCE (not N times)
+    const [therapist] = await db
+      .select({
+        therapist: therapists,
+        user: users,
+      })
+      .from(therapists)
+      .innerJoin(users, eq(therapists.userId, users.id))
+      .where(
+        and(
+          eq(therapists.tenantId, tenantId),
+          eq(therapists.id, therapistId),
+        ),
+      );
+
+    if (!therapist) {
+      return {};
+    }
+
+    // 2. Decrypt therapist name ONCE
+    const encryption = getEncryptionServiceSync();
+    const firstName = therapist.user.firstName ? encryption.decrypt(therapist.user.firstName) : '';
+    const lastName = therapist.user.lastName ? encryption.decrypt(therapist.user.lastName) : '';
+    const therapistName = `${firstName} ${lastName}`.trim();
+
+    // 3. Get location timezone ONCE
+    const locationId = therapist.therapist.primaryLocationId;
+    let timezone = 'America/New_York'; // Default timezone
+
+    if (locationId) {
+      const [location] = await db
+        .select()
+        .from(locations)
+        .where(eq(locations.id, locationId));
+
+      if (location?.timezone) {
+        timezone = location.timezone;
+      }
+    }
+
+    // 4. Batch fetch ALL appointments for the entire date range in ONE query
+    const allAppointments = await db
+      .select()
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.tenantId, tenantId),
+          eq(appointments.therapistId, therapistId),
+          gte(appointments.appointmentDate, startDate),
+          lte(appointments.appointmentDate, endDate),
+          or(
+            eq(appointments.status, 'scheduled'),
+            eq(appointments.status, 'checked-in'),
+            eq(appointments.status, 'confirmed'),
+          ),
+        ),
+      );
+
+    // 5. Group appointments by date (in-memory, fast)
+    const appointmentsByDate = allAppointments.reduce(
+      (acc, apt) => {
+        if (!acc[apt.appointmentDate]) {
+          acc[apt.appointmentDate] = [];
+        }
+
+        acc[apt.appointmentDate]!.push(apt);
+
+        return acc;
+      },
+      {} as Record<string, typeof allAppointments>,
+    );
+
+    // 6. Iterate through dates (no DB queries in loop now - just availability check)
+    const result: Record<string, AvailableSlot[]> = {};
     const start = new Date(startDate);
     const end = new Date(endDate);
-    const result: Record<string, AvailableSlot[]> = {};
-
     const daysDiff = Math.ceil((end.getTime() - start.getTime()) / MILLISECONDS_PER_DAY) + 1;
 
-    // Iterate through each day in range
     for (let i = 0; i < daysDiff; i++) {
       const current = new Date(start.getTime() + i * MILLISECONDS_PER_DAY);
       const dateStr = current.toISOString().split('T')[0];
 
-      if (dateStr) {
-        const slots = await getAvailableSlots(tenantId, therapistId, dateStr, slotDuration);
-        result[dateStr] = slots;
+      if (!dateStr) {
+        continue;
       }
+
+      // Get availability for this date (only external call in loop)
+      const dayAvailability = await getEffectiveAvailability(tenantId, therapistId, dateStr);
+
+      if (!dayAvailability.isAvailable || dayAvailability.timeSlots.length === 0) {
+        result[dateStr] = [];
+        continue;
+      }
+
+      // Get booked appointments for this date from in-memory cache
+      const bookedForDay = appointmentsByDate[dateStr] || [];
+      const availableSlots: AvailableSlot[] = [];
+
+      // Generate slots for each time range
+      for (const timeSlot of dayAvailability.timeSlots) {
+        const slots = generateSlotsFromTimeRange(
+          timeSlot.start,
+          timeSlot.end,
+          slotDuration,
+          dateStr,
+          timezone,
+        );
+
+        for (const slot of slots) {
+          // Check if slot overlaps with any booked appointment
+          const isBooked = bookedForDay.some(apt =>
+            slotsOverlap(slot.startTime, slot.endTime, apt.startTime, apt.endTime),
+          );
+
+          if (!isBooked) {
+            availableSlots.push({
+              startTime: slot.startTime,
+              endTime: slot.endTime,
+              therapistId,
+              therapistName,
+              locationId: locationId || '',
+            });
+          }
+        }
+      }
+
+      result[dateStr] = availableSlots.sort((a, b) => a.startTime.localeCompare(b.startTime));
     }
 
     return result;
