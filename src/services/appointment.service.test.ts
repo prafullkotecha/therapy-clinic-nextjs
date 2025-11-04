@@ -442,7 +442,7 @@ describe('Appointment Service', () => {
     describe('generateSlotsFromTimeRange()', () => {
       describe('Basic slot generation', () => {
         it('should generate 8 hourly slots from 09:00-17:00', () => {
-          const slots = generateSlotsFromTimeRange('09:00', '17:00', 60, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('09:00', '17:00', 60, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(8);
           expect(slots[0]?.startTime).toBe('09:00');
@@ -452,7 +452,7 @@ describe('Appointment Service', () => {
         });
 
         it('should generate 6 half-hour slots from 09:00-12:00', () => {
-          const slots = generateSlotsFromTimeRange('09:00', '12:00', 30, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('09:00', '12:00', 30, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(6);
           expect(slots[0]?.startTime).toBe('09:00');
@@ -462,7 +462,7 @@ describe('Appointment Service', () => {
         });
 
         it('should generate 4 quarter-hour slots from 09:00-10:00', () => {
-          const slots = generateSlotsFromTimeRange('09:00', '10:00', 15, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('09:00', '10:00', 15, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(4);
           expect(slots[0]?.startTime).toBe('09:00');
@@ -472,7 +472,7 @@ describe('Appointment Service', () => {
         });
 
         it('should generate 90-minute slots', () => {
-          const slots = generateSlotsFromTimeRange('09:00', '12:00', 90, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('09:00', '12:00', 90, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(2);
           expect(slots[0]?.startTime).toBe('09:00');
@@ -482,7 +482,7 @@ describe('Appointment Service', () => {
         });
 
         it('should generate 2-hour slots', () => {
-          const slots = generateSlotsFromTimeRange('09:00', '17:00', 120, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('09:00', '17:00', 120, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(4);
           expect(slots[0]?.startTime).toBe('09:00');
@@ -494,7 +494,7 @@ describe('Appointment Service', () => {
 
       describe('Sequential slots (no gaps)', () => {
         it('should generate sequential slots with no gaps', () => {
-          const slots = generateSlotsFromTimeRange('09:00', '12:00', 60, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('09:00', '12:00', 60, '2025-01-15', 'America/New_York');
 
           for (let i = 0; i < slots.length - 1; i++) {
             expect(slots[i]?.endTime).toBe(slots[i + 1]?.startTime);
@@ -502,7 +502,7 @@ describe('Appointment Service', () => {
         });
 
         it('should generate sequential 30-min slots with no gaps', () => {
-          const slots = generateSlotsFromTimeRange('10:00', '13:00', 30, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('10:00', '13:00', 30, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(6);
 
@@ -514,7 +514,7 @@ describe('Appointment Service', () => {
 
       describe('Edge cases - range not divisible by slot duration', () => {
         it('should not generate partial slots (range not divisible)', () => {
-          const slots = generateSlotsFromTimeRange('09:00', '10:45', 60, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('09:00', '10:45', 60, '2025-01-15', 'America/New_York');
 
           // Should only generate 1 slot (09:00-10:00), not partial 10:00-10:45
           expect(slots).toHaveLength(1);
@@ -523,13 +523,13 @@ describe('Appointment Service', () => {
         });
 
         it('should not generate partial 30-min slots', () => {
-          const slots = generateSlotsFromTimeRange('09:00', '10:15', 30, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('09:00', '10:15', 30, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(2); // Only 09:00-09:30, 09:30-10:00
         });
 
         it('should handle odd time ranges', () => {
-          const slots = generateSlotsFromTimeRange('09:23', '11:53', 60, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('09:23', '11:53', 60, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(2); // 09:23-10:23, 10:23-11:23
           expect(slots[0]?.startTime).toBe('09:23');
@@ -539,13 +539,13 @@ describe('Appointment Service', () => {
 
       describe('Edge cases - range too small', () => {
         it('should return empty array when range is smaller than slot duration', () => {
-          const slots = generateSlotsFromTimeRange('09:00', '09:30', 60, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('09:00', '09:30', 60, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(0);
         });
 
         it('should return empty array when range equals slot duration', () => {
-          const slots = generateSlotsFromTimeRange('09:00', '10:00', 60, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('09:00', '10:00', 60, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(1);
           expect(slots[0]?.startTime).toBe('09:00');
@@ -553,7 +553,7 @@ describe('Appointment Service', () => {
         });
 
         it('should return empty array for zero-duration range', () => {
-          const slots = generateSlotsFromTimeRange('09:00', '09:00', 60, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('09:00', '09:00', 60, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(0);
         });
@@ -561,20 +561,20 @@ describe('Appointment Service', () => {
 
       describe('Edge cases - date boundaries', () => {
         it('should handle month boundary dates (Jan 31)', () => {
-          const slots = generateSlotsFromTimeRange('09:00', '12:00', 60, '2025-01-31');
+          const slots = generateSlotsFromTimeRange('09:00', '12:00', 60, '2025-01-31', 'America/New_York');
 
           expect(slots).toHaveLength(3);
           expect(slots[0]?.startTime).toBe('09:00');
         });
 
         it('should handle leap year date (Feb 29, 2024)', () => {
-          const slots = generateSlotsFromTimeRange('09:00', '12:00', 60, '2024-02-29');
+          const slots = generateSlotsFromTimeRange('09:00', '12:00', 60, '2024-02-29', 'America/New_York');
 
           expect(slots).toHaveLength(3);
         });
 
         it('should handle year boundary (Dec 31)', () => {
-          const slots = generateSlotsFromTimeRange('09:00', '12:00', 60, '2024-12-31');
+          const slots = generateSlotsFromTimeRange('09:00', '12:00', 60, '2024-12-31', 'America/New_York');
 
           expect(slots).toHaveLength(3);
         });
@@ -582,19 +582,19 @@ describe('Appointment Service', () => {
 
       describe('Edge cases - invalid input handling', () => {
         it('should return empty array for invalid time format', () => {
-          const slots = generateSlotsFromTimeRange('invalid', '12:00', 60, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('invalid', '12:00', 60, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(0);
         });
 
         it('should return empty array for undefined hour/minute', () => {
-          const slots = generateSlotsFromTimeRange(':', '12:00', 60, '2025-01-15');
+          const slots = generateSlotsFromTimeRange(':', '12:00', 60, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(0);
         });
 
         it('should handle end time before start time', () => {
-          const slots = generateSlotsFromTimeRange('12:00', '09:00', 60, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('12:00', '09:00', 60, '2025-01-15', 'America/New_York');
 
           // Should return empty array as range is invalid
           expect(slots).toHaveLength(0);
@@ -603,14 +603,14 @@ describe('Appointment Service', () => {
 
       describe('Time variations', () => {
         it('should handle early morning times (starting at midnight)', () => {
-          const slots = generateSlotsFromTimeRange('00:00', '02:00', 60, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('00:00', '02:00', 60, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(2);
           expect(slots[0]?.startTime).toBe('00:00');
         });
 
         it('should handle late evening times', () => {
-          const slots = generateSlotsFromTimeRange('22:00', '23:30', 30, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('22:00', '23:30', 30, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(3);
           expect(slots[0]?.startTime).toBe('22:00');
@@ -618,7 +618,7 @@ describe('Appointment Service', () => {
         });
 
         it('should handle times with non-zero minutes', () => {
-          const slots = generateSlotsFromTimeRange('09:15', '11:15', 30, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('09:15', '11:15', 30, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(4);
           expect(slots[0]?.startTime).toBe('09:15');
@@ -627,20 +627,20 @@ describe('Appointment Service', () => {
 
       describe('Slot duration variations', () => {
         it('should handle 15-minute slots (high granularity)', () => {
-          const slots = generateSlotsFromTimeRange('09:00', '10:00', 15, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('09:00', '10:00', 15, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(4);
         });
 
         it('should handle 45-minute slots', () => {
-          const slots = generateSlotsFromTimeRange('09:00', '12:00', 45, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('09:00', '12:00', 45, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(4);
           expect(slots[0]?.endTime).toBe('09:45');
         });
 
         it('should handle 3-hour slots', () => {
-          const slots = generateSlotsFromTimeRange('09:00', '15:00', 180, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('09:00', '15:00', 180, '2025-01-15', 'America/New_York');
 
           expect(slots).toHaveLength(2);
           expect(slots[0]?.endTime).toBe('12:00');
@@ -738,7 +738,7 @@ describe('Appointment Service', () => {
 
       it('should efficiently generate many time slots', () => {
         const startTime = performance.now();
-        const slots = generateSlotsFromTimeRange('09:00', '17:00', 15, '2025-01-15');
+        const slots = generateSlotsFromTimeRange('09:00', '17:00', 15, '2025-01-15', 'America/New_York');
         const endTime = performance.now();
         const duration = endTime - startTime;
 
@@ -750,7 +750,7 @@ describe('Appointment Service', () => {
         const startTime = performance.now();
 
         // Generate full day of 15-min slots
-        const slots = generateSlotsFromTimeRange('00:00', '23:45', 15, '2025-01-15');
+        const slots = generateSlotsFromTimeRange('00:00', '23:45', 15, '2025-01-15', 'America/New_York');
         const endTime = performance.now();
         const duration = endTime - startTime;
 
@@ -765,7 +765,7 @@ describe('Appointment Service', () => {
         const dates = ['2025-03-09', '2025-06-21', '2025-12-21'];
 
         dates.forEach((date) => {
-          const slots = generateSlotsFromTimeRange('09:00', '11:00', 60, date);
+          const slots = generateSlotsFromTimeRange('09:00', '11:00', 60, date, 'America/New_York');
 
           expect(slots).toHaveLength(2);
           expect(slots[0]?.startTime).toBe('09:00');
@@ -776,7 +776,7 @@ describe('Appointment Service', () => {
         const durations = [15, 30, 45, 60, 90, 120];
 
         durations.forEach((duration) => {
-          const slots = generateSlotsFromTimeRange('09:00', '12:00', duration, '2025-01-15');
+          const slots = generateSlotsFromTimeRange('09:00', '12:00', duration, '2025-01-15', 'America/New_York');
 
           expect(slots.length).toBeGreaterThan(0);
 
@@ -795,7 +795,7 @@ describe('Appointment Service', () => {
         const dates = ['2025-01-31', '2025-02-28', '2025-12-31', '2024-02-29'];
 
         dates.forEach((date) => {
-          const slots = generateSlotsFromTimeRange('09:00', '12:00', 60, date);
+          const slots = generateSlotsFromTimeRange('09:00', '12:00', 60, date, 'America/New_York');
 
           expect(slots).toHaveLength(3);
           expect(slots[0]?.startTime).toBe('09:00');
@@ -804,8 +804,8 @@ describe('Appointment Service', () => {
 
       it('should handle time string variations gracefully', () => {
         // Test that leading zeros are handled correctly
-        const slots1 = generateSlotsFromTimeRange('09:00', '11:00', 60, '2025-01-15');
-        const slots2 = generateSlotsFromTimeRange('09:00', '11:00', 60, '2025-01-15');
+        const slots1 = generateSlotsFromTimeRange('09:00', '11:00', 60, '2025-01-15', 'America/New_York');
+        const slots2 = generateSlotsFromTimeRange('09:00', '11:00', 60, '2025-01-15', 'America/New_York');
 
         expect(slots1).toEqual(slots2);
       });
