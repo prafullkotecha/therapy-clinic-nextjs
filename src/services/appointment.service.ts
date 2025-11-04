@@ -487,6 +487,13 @@ export async function cancelAppointment(
         : null,
     };
 
+    // Process waitlist asynchronously (don't block cancellation)
+    // Fire and forget - errors are logged but don't affect cancellation
+    processWaitlist(tenantId, cancelled.therapistId, cancelled.appointmentDate)
+      .catch((error) => {
+        logger.error('Error processing waitlist after cancellation:', error);
+      });
+
     return decrypted as AppointmentWithDetails;
   });
 }
@@ -602,7 +609,7 @@ export function generateSlotsFromTimeRange(
     }
   } catch (err) {
     logger.warn(
-      `generateSlotsFromTimeRange: Failed to generate slots for date=${date}, startTime=${startTime}, endTime=${endTime}, slotDuration=${slotDuration}, timezone=${timezone}. Error: ${err instanceof Error ? err.message : String(err)}`
+      `generateSlotsFromTimeRange: Failed to generate slots for date=${date}, startTime=${startTime}, endTime=${endTime}, slotDuration=${slotDuration}, timezone=${timezone}. Error: ${err instanceof Error ? err.message : String(err)}`,
     );
     // Return empty array for invalid input
     return slots;
@@ -1126,18 +1133,154 @@ export async function addToWaitlist(
 
 /**
  * Check waitlist and notify clients when slots become available
+ * Processes waitlist entries after an appointment is cancelled
+ * Matches clients based on therapist, date preferences, time preferences, and priority
  */
 export async function processWaitlist(
   tenantId: string,
-  _therapistId: string,
-  _date: string,
+  therapistId: string,
+  date: string,
 ): Promise<void> {
   return withTenantContext(tenantId, async () => {
-    // TODO: Implement waitlist processing logic
-    // This is a placeholder implementation
-    // Full implementation requires:
-    // 1. Get waiting clients for this therapist
-    // 2. Check available slots and notify first client in queue
-    // 3. Implement notification service integration
+    const { sendWaitlistNotification } = await import('./notification.service');
+
+    // Get all waiting clients for this therapist, ordered by priority (urgent first) and timestamp
+    const waitingClients = await db
+      .select()
+      .from(waitlist)
+      .where(
+        and(
+          eq(waitlist.tenantId, tenantId),
+          eq(waitlist.therapistId, therapistId),
+          eq(waitlist.status, 'waiting'),
+        ),
+      )
+      .orderBy(
+        // Priority DESC (urgent before standard)
+        sql`CASE WHEN ${waitlist.priority} = 'urgent' THEN 1 ELSE 2 END ASC`,
+        // Then by addedAt ASC (first come, first served)
+        waitlist.addedAt,
+      );
+
+    if (waitingClients.length === 0) {
+      logger.info(`No clients on waitlist for therapist ${therapistId}`);
+      return;
+    }
+
+    // Get available slots for this therapist on the cancelled date
+    const availableSlots = await getAvailableSlots(
+      tenantId,
+      therapistId,
+      date,
+    );
+
+    if (availableSlots.length === 0) {
+      logger.info(`No available slots for therapist ${therapistId} on ${date}`);
+      return;
+    }
+
+    // Get therapist details for notification
+    const [therapist] = await db
+      .select({
+        therapist: therapists,
+        user: users,
+      })
+      .from(therapists)
+      .innerJoin(users, eq(therapists.userId, users.id))
+      .where(
+        and(
+          eq(therapists.tenantId, tenantId),
+          eq(therapists.id, therapistId),
+        ),
+      );
+
+    if (!therapist) {
+      logger.error(`Therapist ${therapistId} not found`);
+      return;
+    }
+
+    const encryption = getEncryptionServiceSync();
+    const firstName = therapist.user.firstName ? encryption.decrypt(therapist.user.firstName) : '';
+    const lastName = therapist.user.lastName ? encryption.decrypt(therapist.user.lastName) : '';
+    const therapistName = `${firstName} ${lastName}`.trim();
+
+    // Process waitlist entries
+    let slotsNotified = 0;
+
+    for (const entry of waitingClients) {
+      // Check if this client has date preferences
+      const preferredDates = entry.preferredDates as string[] | null;
+      const preferredTimes = entry.preferredTimes as string[] | null;
+
+      // Filter slots based on client preferences
+      let matchingSlots = [...availableSlots];
+
+      // Apply date preference filter if specified
+      if (preferredDates && preferredDates.length > 0) {
+        if (!preferredDates.includes(date)) {
+          // This date is not in their preferred dates, skip
+          continue;
+        }
+      }
+
+      // Apply time preference filter if specified
+      if (preferredTimes && preferredTimes.length > 0) {
+        matchingSlots = matchingSlots.filter((slot) => {
+          // Check if slot start time matches any preferred time
+          return preferredTimes.some((preferredTime) => {
+            // Compare just HH:MM portion
+            const slotTime = slot.startTime.substring(0, 5);
+            const prefTime = preferredTime.substring(0, 5);
+            return slotTime === prefTime;
+          });
+        });
+
+        if (matchingSlots.length === 0) {
+          // No slots match their time preferences
+          continue;
+        }
+      }
+
+      // Notify client about the first matching slot
+      const slotToNotify = matchingSlots[0];
+
+      if (slotToNotify) {
+        try {
+          await sendWaitlistNotification(
+            entry.clientId,
+            therapistName,
+            date,
+            slotToNotify.startTime,
+            slotToNotify.endTime,
+          );
+
+          // Update waitlist entry status to notified
+          await db
+            .update(waitlist)
+            .set({
+              status: 'notified',
+              notifiedAt: new Date(),
+            })
+            .where(eq(waitlist.id, entry.id));
+
+          slotsNotified++;
+
+          logger.info(
+            `Notified client ${entry.clientId} about slot on ${date} at ${slotToNotify.startTime}`,
+          );
+
+          // Note: We don't break here to notify multiple clients about different slots
+          // Each gets notified about the best available slot for them
+          // It's first-come-first-served when they accept
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          logger.error(`Failed to notify client ${entry.clientId}:`, { error: errorMessage });
+        }
+      }
+    }
+
+    logger.info(
+      `Processed waitlist for therapist ${therapistId} on ${date}: notified ${slotsNotified} clients`,
+    );
   });
 }
