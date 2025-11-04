@@ -600,7 +600,10 @@ export function generateSlotsFromTimeRange(
       // Move to next slot
       currentSlotStart = new Date(currentSlotStart.getTime() + slotDuration * MILLISECONDS_PER_MINUTE);
     }
-  } catch {
+  } catch (err) {
+    logger.warn(
+      `generateSlotsFromTimeRange: Failed to generate slots for date=${date}, startTime=${startTime}, endTime=${endTime}, slotDuration=${slotDuration}, timezone=${timezone}. Error: ${err instanceof Error ? err.message : String(err)}`
+    );
     // Return empty array for invalid input
     return slots;
   }
