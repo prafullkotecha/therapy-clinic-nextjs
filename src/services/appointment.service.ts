@@ -14,7 +14,10 @@ import { withTenantContext } from '@/lib/tenant-db';
 import { db } from '@/libs/DB';
 import { logger } from '@/libs/Logger';
 import { appointments, waitlist } from '@/models/appointment.schema';
+import { therapists } from '@/models/therapist.schema';
+import { users } from '@/models/user.schema';
 import { logAudit } from '@/services/audit.service';
+import { getEffectiveAvailability } from '@/services/availability.service';
 
 /**
  * Appointment Service
@@ -574,9 +577,6 @@ export async function getAvailableSlots(
   slotDuration: number = DEFAULT_APPOINTMENT_DURATION_MINUTES,
 ): Promise<AvailableSlot[]> {
   return withTenantContext(tenantId, async () => {
-    // Import availability service functions
-    const { getEffectiveAvailability } = await import('@/services/availability.service');
-
     // Get effective availability for the date
     const dayAvailability = await getEffectiveAvailability(tenantId, therapistId, date);
 
@@ -602,9 +602,6 @@ export async function getAvailableSlots(
       );
 
     // Get therapist details for name and location
-    const { therapists } = await import('@/models/therapist.schema');
-    const { users } = await import('@/models/user.schema');
-
     const [therapist] = await db
       .select({
         therapist: therapists,
@@ -685,8 +682,7 @@ export async function getAvailableSlotsRange(
 
     // Iterate through each day in range
     for (let i = 0; i < daysDiff; i++) {
-      const current = new Date(start);
-      current.setDate(start.getDate() + i);
+      const current = new Date(start.getTime() + i * MILLISECONDS_PER_DAY);
       const dateStr = current.toISOString().split('T')[0];
 
       if (dateStr) {
