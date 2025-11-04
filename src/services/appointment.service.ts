@@ -505,8 +505,9 @@ export async function rescheduleAppointment(
 
 /**
  * Helper: Check if two time slots overlap
+ * Exported for testing purposes only
  */
-function slotsOverlap(
+export function slotsOverlap(
   start1: string,
   end1: string,
   start2: string,
@@ -518,8 +519,9 @@ function slotsOverlap(
 
 /**
  * Helper: Generate time slots from a time range
+ * Exported for testing purposes only
  */
-function generateSlotsFromTimeRange(
+export function generateSlotsFromTimeRange(
   startTime: string,
   endTime: string,
   slotDuration: number,
