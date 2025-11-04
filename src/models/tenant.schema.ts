@@ -48,6 +48,9 @@ export const locations = pgTable('locations', {
   // { monday: { open: '09:00', close: '17:00' }, ... }
   operatingHours: jsonb('operating_hours'),
 
+  // IANA timezone identifier (e.g., 'America/New_York', 'America/Los_Angeles')
+  timezone: varchar('timezone', { length: 50 }).notNull().default('America/New_York'),
+
   isActive: boolean('is_active').default(true),
   isPrimary: boolean('is_primary').default(false),
 
