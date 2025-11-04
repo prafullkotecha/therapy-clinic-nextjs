@@ -7,6 +7,7 @@ import type {
   UpdateAppointmentInput,
 } from '@/validations/appointment.validation';
 import { and, eq, gte, lte, or, sql } from 'drizzle-orm';
+import { DEFAULT_APPOINTMENT_DURATION_MINUTES } from '@/constants/appointments';
 import { getEncryptionServiceSync } from '@/lib/encryption';
 import { withTenantContext } from '@/lib/tenant-db';
 import { db } from '@/libs/DB';
@@ -494,7 +495,7 @@ export async function getAvailableSlots(
   tenantId: string,
   _therapistId: string,
   _date: string,
-  _slotDuration: number = 60, // minutes
+  _slotDuration: number = DEFAULT_APPOINTMENT_DURATION_MINUTES,
 ): Promise<AvailableSlot[]> {
   return withTenantContext(tenantId, async () => {
     // TODO: Implement slot generation logic
@@ -550,17 +551,26 @@ export async function addToWaitlist(
   preferredDates?: string[],
   preferredTimes?: string[],
   priority: 'standard' | 'urgent' = 'standard',
-): Promise<void> {
+): Promise<typeof waitlist.$inferSelect> {
   return withTenantContext(tenantId, async () => {
-    await db.insert(waitlist).values({
-      tenantId,
-      clientId,
-      therapistId,
-      preferredDates: preferredDates || [],
-      preferredTimes: preferredTimes || [],
-      priority,
-      status: 'waiting',
-    });
+    const [newEntry] = await db
+      .insert(waitlist)
+      .values({
+        tenantId,
+        clientId,
+        therapistId,
+        preferredDates: preferredDates || [],
+        preferredTimes: preferredTimes || [],
+        priority,
+        status: 'waiting',
+      })
+      .returning();
+
+    if (!newEntry) {
+      throw new Error('Failed to add to waitlist');
+    }
+
+    return newEntry;
   });
 }
 
