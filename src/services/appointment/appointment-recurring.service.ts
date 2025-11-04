@@ -1,6 +1,6 @@
 // Import from core service (will be updated after refactor complete)
 // These imports will be updated to use the proper barrel export
-import type { AppointmentWithDetails } from '../appointment.service';
+import type { AppointmentWithDetails, ConflictCheckResult } from '../appointment.service';
 import type {
   RecurrencePattern,
   RecurringAppointmentInput,
@@ -170,8 +170,8 @@ export async function createRecurringAppointments(
     if (allConflicts.length > 0) {
       const conflictDetails = allConflicts
         .map(
-          c =>
-            `${c.date}: ${c.conflicts.map((cf: any) => cf.reason).join(', ')}`,
+          (c: { date: string; conflicts: ConflictCheckResult['conflicts'] }) =>
+            `${c.date}: ${c.conflicts.map(cf => cf.reason).join(', ')}`,
         )
         .join('; ');
       throw new Error(
