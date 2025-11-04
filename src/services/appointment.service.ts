@@ -571,7 +571,7 @@ export function generateSlotsFromTimeRange(
   endTime: string,
   slotDuration: number,
   date: string,
-  timezone: string = 'America/New_York',
+  timezone: string,
 ): Array<{ startTime: string; endTime: string }> {
   const slots: Array<{ startTime: string; endTime: string }> = [];
 
