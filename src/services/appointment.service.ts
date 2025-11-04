@@ -7,6 +7,7 @@ import type {
   RescheduleAppointmentInput,
   UpdateAppointmentInput,
 } from '@/validations/appointment.validation';
+import { addDays, differenceInDays, format } from 'date-fns';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { and, eq, gte, lte, or, sql } from 'drizzle-orm';
 import { DEFAULT_APPOINTMENT_DURATION_MINUTES } from '@/constants/appointments';
@@ -30,7 +31,6 @@ import { getEffectiveAvailability } from '@/services/availability.service';
 
 // Constants for time calculations
 const MILLISECONDS_PER_MINUTE = 60 * 1000;
-const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
  * Parse date and time in a specific timezone and return UTC Date object
@@ -812,11 +812,11 @@ export async function getAvailableSlotsRange(
     const result: Record<string, AvailableSlot[]> = {};
     const start = new Date(startDate);
     const end = new Date(endDate);
-    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / MILLISECONDS_PER_DAY) + 1;
+    const daysDiff = differenceInDays(end, start) + 1;
 
     for (let i = 0; i < daysDiff; i++) {
-      const current = new Date(start.getTime() + i * MILLISECONDS_PER_DAY);
-      const dateStr = current.toISOString().split('T')[0];
+      const current = addDays(start, i);
+      const dateStr = format(current, 'yyyy-MM-dd');
 
       if (!dateStr) {
         continue;
