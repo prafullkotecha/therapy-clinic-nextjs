@@ -241,23 +241,26 @@ export async function createAppointment(
   userId: string,
   input: CreateAppointmentInput,
   parentAppointmentId?: string,
+  skipConflictCheck = false,
 ): Promise<AppointmentWithDetails> {
   return withTenantContext(tenantId, async () => {
     const encryption = getEncryptionServiceSync();
 
-    // Check for conflicts
-    const conflictCheck = await checkConflicts(
-      tenantId,
-      input.therapistId,
-      input.appointmentDate,
-      input.startTime,
-      input.endTime,
-    );
-
-    if (conflictCheck.hasConflict) {
-      throw new Error(
-        `Scheduling conflict: ${conflictCheck.conflicts.map(c => c.reason).join(', ')}`,
+    // Check for conflicts (skip if already checked in batch, e.g., for recurring appointments)
+    if (!skipConflictCheck) {
+      const conflictCheck = await checkConflicts(
+        tenantId,
+        input.therapistId,
+        input.appointmentDate,
+        input.startTime,
+        input.endTime,
       );
+
+      if (conflictCheck.hasConflict) {
+        throw new Error(
+          `Scheduling conflict: ${conflictCheck.conflicts.map(c => c.reason).join(', ')}`,
+        );
+      }
     }
 
     // Encrypt PHI fields
@@ -675,6 +678,7 @@ export async function createRecurringAppointments(
     }
 
     // Create child appointments
+    // Note: Skip individual conflict checks since we already validated all dates above
     const childAppointmentPromises = generatedDates.map(async (date) => {
       try {
         const childAppointment = await createAppointment(
@@ -687,6 +691,7 @@ export async function createRecurringAppointments(
             recurrencePattern: undefined,
           },
           parentAppointment.id, // Pass parentAppointmentId directly
+          true, // skipConflictCheck - already validated in batch above
         );
 
         return childAppointment;
@@ -703,8 +708,9 @@ export async function createRecurringAppointments(
     const results = await Promise.all(childAppointmentPromises);
 
     // Separate successful and failed appointments
-    const successful = results.filter(r => !('error' in r)) as AppointmentWithDetails[];
-    const failed = results.filter(r => 'error' in r) as Array<{
+    // Use 'id' presence as discriminator (more robust than checking for 'error')
+    const successful = results.filter(r => 'id' in r) as AppointmentWithDetails[];
+    const failed = results.filter(r => !('id' in r)) as Array<{
       error: boolean;
       date: string;
       message: string;
