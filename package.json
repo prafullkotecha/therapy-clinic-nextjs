@@ -55,7 +55,7 @@
     "date-fns-tz": "^3.2.0",
     "drizzle-orm": "^0.44.7",
     "keycloak-js": "^26.2.1",
-    "next": "^16.0.0",
+    "next": "^16.1.2",
     "next-auth": "^5.0.0-beta.30",
     "next-intl": "^4.4.0",
     "pg": "^8.16.3",
