@@ -10,6 +10,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Basic: Story = {
+  args: {
+    children: 'Card',
+  },
   render: () => (
     <Card>
       <CardBody>Simple card content</CardBody>
@@ -18,6 +21,9 @@ export const Basic: Story = {
 };
 
 export const WithHeaderAndFooter: Story = {
+  args: {
+    children: 'Card',
+  },
   render: () => (
     <Card>
       <CardHeader>Card Header</CardHeader>

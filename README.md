@@ -122,7 +122,7 @@ docker-compose up -d
 
 2. **Configure Keycloak**: Create a new realm and client in Keycloak. Configure the client with the appropriate redirect URIs for your application.
 
-3. **Add environment variables**: Copy the following values to your `.env.local` file (not tracked by Git):
+3. **Add environment variables**: Copy `.env.example` to `.env.local` (not tracked by Git), then set:
 
 ```shell
 NEXTAUTH_URL=http://localhost:3000
@@ -188,7 +188,8 @@ You can easily configure Next js Boilerplate by searching the entire project for
 - `src/utils/AppConfig.ts`: configuration file
 - `src/templates/BaseTemplate.tsx`: default theme
 - `next.config.ts`: Next.js configuration
-- `.env`: default environment variables
+- `.env.example`: template environment variables
+- `.env.local`: local environment variables (gitignored)
 
 You have full access to the source code for further customization. The provided code is just an example to help you start your project. The sky's the limit 🚀.
 

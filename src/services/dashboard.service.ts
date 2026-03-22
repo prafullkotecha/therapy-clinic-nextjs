@@ -1,11 +1,11 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { withTenantContext } from '@/lib/tenant-db';
+import { UserRoles } from '@/lib/rbac';
 import { db } from '@/libs/DB';
 import { appointments } from '@/models/appointment.schema';
 import { clients } from '@/models/client.schema';
 import { therapists } from '@/models/therapist.schema';
 import { users } from '@/models/user.schema';
-import { UserRoles } from '@/models/types';
 
 export type DashboardStats = {
   totalClients: number;

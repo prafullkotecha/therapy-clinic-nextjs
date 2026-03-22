@@ -117,22 +117,19 @@ describe('Waitlist Processing', () => {
         'standard',
       );
 
-      // Mock getAvailableSlots to return available slots
-      const mockGetAvailableSlots = vi.fn().mockResolvedValue([
-        {
-          startTime: '09:00',
-          endTime: '10:00',
-          therapistId: testTherapistId,
-          therapistName: 'Test Therapist',
-          locationId: 'location-1',
-        },
-      ]);
-
       vi.mock('./appointment', async (importOriginal) => {
         const original = await importOriginal<typeof import('./appointment')>();
         return {
           ...original,
-          getAvailableSlots: mockGetAvailableSlots,
+          getAvailableSlots: vi.fn().mockResolvedValue([
+            {
+              startTime: '09:00',
+              endTime: '10:00',
+              therapistId: testTherapistId,
+              therapistName: 'Test Therapist',
+              locationId: 'location-1',
+            },
+          ]),
         };
       });
 
@@ -216,14 +213,11 @@ describe('Waitlist Processing', () => {
         'standard',
       );
 
-      // Mock getAvailableSlots to return empty array
-      const mockGetAvailableSlots = vi.fn().mockResolvedValue([]);
-
       vi.mock('./appointment', async (importOriginal) => {
         const original = await importOriginal<typeof import('./appointment')>();
         return {
           ...original,
-          getAvailableSlots: mockGetAvailableSlots,
+          getAvailableSlots: vi.fn().mockResolvedValue([]),
         };
       });
 

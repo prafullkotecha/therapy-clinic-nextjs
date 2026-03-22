@@ -1142,7 +1142,7 @@ export async function processWaitlist(
   date: string,
 ): Promise<void> {
   return withTenantContext(tenantId, async () => {
-    const { sendWaitlistNotification } = await import('./notification.service');
+    const { sendWaitlistNotification } = await import('../notification.service');
 
     // Get all waiting clients for this therapist, ordered by priority (urgent first) and timestamp
     const waitingClients = await db
