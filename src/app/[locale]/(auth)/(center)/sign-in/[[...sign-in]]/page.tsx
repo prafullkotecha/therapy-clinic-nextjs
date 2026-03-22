@@ -2,13 +2,11 @@ import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
+import { getEnabledAuthProviders } from '@/lib/auth-providers';
 import { Card, CardBody } from '@/components/ui/Card';
 import { auth, signIn } from '@/lib/auth';
 
-const enabledProviders = (process.env.AUTH_PROVIDERS ?? 'keycloak')
-  .split(',')
-  .map(provider => provider.trim().toLowerCase())
-  .filter(Boolean);
+const enabledProviders = getEnabledAuthProviders(process.env.AUTH_PROVIDERS);
 const useCredentialsProvider = enabledProviders.includes('credentials');
 const useKeycloakProvider = enabledProviders.includes('keycloak');
 

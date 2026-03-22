@@ -1,5 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { withTenantContext } from '@/lib/tenant-db';
+import type { UserRole } from '@/lib/rbac';
 import { UserRoles } from '@/lib/rbac';
 import { db } from '@/libs/DB';
 import { appointments } from '@/models/appointment.schema';
@@ -16,7 +17,7 @@ export type DashboardStats = {
 export async function getDashboardStats(
   tenantId: string,
   userId: string,
-  userRole: string,
+  userRole: UserRole,
 ): Promise<DashboardStats> {
   return withTenantContext(tenantId, async () => {
     const today = new Date().toISOString().split('T')[0]!;
