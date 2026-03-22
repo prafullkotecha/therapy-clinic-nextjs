@@ -34,17 +34,10 @@ import {
   UrgencyLevel,
   UserRole,
 } from '@/models/types';
-
 import { users } from '@/models/user.schema';
-
-/**
- * Format Date object to PostgreSQL date format (YYYY-MM-DD)
- * @param date - Date object to format
- * @returns Formatted date string
- */
-function formatDateForPostgres(date: Date): string {
-  return date.toISOString().split('T')[0]!;
-}
+import { appointmentFactory } from '@/testing/factories/appointment.factory';
+import { formatDateForPostgres } from '@/testing/factories/helpers';
+import { userFactory } from '@/testing/factories/user.factory';
 
 /**
  * Main seed function
@@ -384,12 +377,14 @@ async function seedUsers(
   const insertedUsers = await db
     .insert(users)
     .values(
-      userData.map(u => ({
-        ...u,
-        tenantId,
-        isActive: true,
-        mfaEnabled: false,
-      })),
+      userData.map(u =>
+        userFactory.build({
+          ...u,
+          tenantId,
+          isActive: true,
+          mfaEnabled: false,
+        }),
+      ),
     )
     .returning({ id: users.id, email: users.email });
 
@@ -1017,18 +1012,20 @@ async function seedAppointments(
     const endTime = '11:00:00';
 
     return {
-      tenantId,
-      locationId: faker.helpers.arrayElement(locationIds),
-      clientId: clientIds[clientIndex]!,
-      therapistId: therapistIds[therapistIndex]!,
-      appointmentDate: formatDateForPostgres(appointmentDate),
-      startTime,
-      endTime,
-      duration: 60,
-      appointmentType: type,
-      status,
-      isRecurring: false,
-      createdBy: Object.values(userIds)[0]!, // Admin
+      ...appointmentFactory.build({
+        tenantId,
+        locationId: faker.helpers.arrayElement(locationIds),
+        clientId: clientIds[clientIndex]!,
+        therapistId: therapistIds[therapistIndex]!,
+        appointmentDate: formatDateForPostgres(appointmentDate),
+        startTime,
+        endTime,
+        duration: 60,
+        appointmentType: type,
+        status,
+        isRecurring: false,
+        createdBy: Object.values(userIds)[0]!, // Admin
+      }),
     };
   };
 

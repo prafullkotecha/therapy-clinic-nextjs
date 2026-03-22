@@ -1,7 +1,12 @@
 import { CalendarIcon, CreditCardIcon, UsersIcon } from '@heroicons/react/24/outline';
 import { Card } from '@/components/ui/Card';
+import type { DashboardStats } from '@/services/dashboard.service';
 
-export function AdminDashboard() {
+type AdminDashboardProps = {
+  stats: DashboardStats;
+};
+
+export function AdminDashboard({ stats }: AdminDashboardProps) {
   return (
     <div className="space-y-6">
       <div>
@@ -20,7 +25,7 @@ export function AdminDashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Clients</p>
-              <p className="text-2xl font-bold text-gray-900">142</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalClients}</p>
             </div>
           </div>
         </Card>
@@ -32,7 +37,7 @@ export function AdminDashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Today&apos;s Appointments</p>
-              <p className="text-2xl font-bold text-gray-900">23</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.todaysAppointments}</p>
             </div>
           </div>
         </Card>

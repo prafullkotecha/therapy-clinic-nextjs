@@ -12,24 +12,22 @@ import { clearFailedAttempts, isAccountLocked } from '@/services/lockout.service
 
 // Development auth bypass - only enabled when DEV_BYPASS_AUTH=true and NODE_ENV=development
 const isDevBypassEnabled = Env.DEV_BYPASS_AUTH === 'true' && Env.NODE_ENV === 'development';
-
-// Production safety check
-if (Env.DEV_BYPASS_AUTH === 'true' && Env.NODE_ENV === 'production') {
-  throw new Error(
-    'SECURITY ERROR: DEV_BYPASS_AUTH cannot be enabled in production! '
-    + 'This would bypass all authentication and allow unauthorized access.',
-  );
-}
+const enabledProviders = (process.env.AUTH_PROVIDERS ?? 'keycloak')
+  .split(',')
+  .map(provider => provider.trim().toLowerCase())
+  .filter(Boolean);
+const useCredentialsProvider = isDevBypassEnabled || enabledProviders.includes('credentials');
+const useKeycloakProvider = enabledProviders.includes('keycloak') && !isDevBypassEnabled;
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true, // Required for localhost in development
   providers: [
-    // Development bypass provider - fetch real user from database by email
-    ...(isDevBypassEnabled
+    // Credentials provider (development bypass mode) - fetch real user from database by email
+    ...(useCredentialsProvider
       ? [
           Credentials({
-            id: 'dev-bypass',
-            name: 'Development Bypass',
+            id: 'credentials',
+            name: isDevBypassEnabled ? 'Development Bypass' : 'Credentials',
             credentials: {
               email: { label: 'Email', type: 'text' },
             },
@@ -62,7 +60,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         ]
       : []),
     // Keycloak provider (disabled in dev when bypass is enabled)
-    ...((!isDevBypassEnabled)
+    ...(useKeycloakProvider
       ? [
           Keycloak({
             clientId: process.env.KEYCLOAK_CLIENT_ID!,
@@ -76,8 +74,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async signIn({ user, account, profile }) {
       // Check account lockout and log successful login
       try {
-        // Dev bypass provider
-        if (account?.provider === 'dev-bypass') {
+        // Credentials provider in development bypass mode
+        if (account?.provider === 'credentials') {
+          if (!isDevBypassEnabled) {
+            return false;
+          }
+
           // User is already fetched and validated in authorize()
           // Access tenantId and email from user object (no need to re-fetch)
           const tenantId = user.tenantId as string;
@@ -156,8 +158,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, account, profile, user }) {
       // Persist additional user info in the JWT
       if (account) {
-        // Dev bypass provider
-        if (account.provider === 'dev-bypass' && user) {
+        // Credentials provider
+        if (account.provider === 'credentials' && user) {
           token.sub = user.id; // Set user ID in token.sub for NextAuth v5
           token.accessToken = DEV_BYPASS_TOKEN;
           token.idToken = DEV_BYPASS_TOKEN;

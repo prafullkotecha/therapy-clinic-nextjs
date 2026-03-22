@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth-helpers';
-import { cancelAppointment } from '@/services/appointment.service';
+import { cancelAppointment } from '@/services/appointment';
 import { CancelAppointmentSchema } from '@/validations/appointment.validation';
 
 type RouteContext = {

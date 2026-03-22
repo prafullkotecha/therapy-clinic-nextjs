@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/libs/DB';
 import { appointments, waitlist } from '@/models/appointment.schema';
-import { addToWaitlist, processWaitlist } from './appointment.service';
+import { addToWaitlist, processWaitlist } from './appointment';
 
 // Mock the notification service
 vi.mock('./notification.service', () => ({
@@ -128,8 +128,8 @@ describe('Waitlist Processing', () => {
         },
       ]);
 
-      vi.mock('./appointment.service', async (importOriginal) => {
-        const original = await importOriginal<typeof import('./appointment.service')>();
+      vi.mock('./appointment', async (importOriginal) => {
+        const original = await importOriginal<typeof import('./appointment')>();
         return {
           ...original,
           getAvailableSlots: mockGetAvailableSlots,
@@ -219,8 +219,8 @@ describe('Waitlist Processing', () => {
       // Mock getAvailableSlots to return empty array
       const mockGetAvailableSlots = vi.fn().mockResolvedValue([]);
 
-      vi.mock('./appointment.service', async (importOriginal) => {
-        const original = await importOriginal<typeof import('./appointment.service')>();
+      vi.mock('./appointment', async (importOriginal) => {
+        const original = await importOriginal<typeof import('./appointment')>();
         return {
           ...original,
           getAvailableSlots: mockGetAvailableSlots,

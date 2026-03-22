@@ -5,7 +5,7 @@ import { getAuthContext } from '@/lib/auth-helpers';
 import { withTenantContext } from '@/lib/tenant-db';
 import { db } from '@/libs/DB';
 import { waitlist } from '@/models/appointment.schema';
-import { addToWaitlist } from '@/services/appointment.service';
+import { addToWaitlist } from '@/services/appointment';
 import { WaitlistSchema } from '@/validations/appointment.validation';
 
 /**

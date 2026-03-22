@@ -1,7 +1,12 @@
 import { CheckCircleIcon, CreditCardIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { Card } from '@/components/ui/Card';
+import type { DashboardStats } from '@/services/dashboard.service';
 
-export function BillingDashboard() {
+type BillingDashboardProps = {
+  stats: DashboardStats;
+};
+
+export function BillingDashboard({ stats }: BillingDashboardProps) {
   return (
     <div className="space-y-6">
       <div>
@@ -20,7 +25,7 @@ export function BillingDashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Unbilled Sessions</p>
-              <p className="text-2xl font-bold text-gray-900">15</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.todaysAppointments}</p>
             </div>
           </div>
         </Card>

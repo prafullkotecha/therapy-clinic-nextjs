@@ -64,7 +64,7 @@ export default function DevLoginPage(): React.JSX.Element {
     setError(null);
 
     try {
-      const result = await signIn('dev-bypass', {
+      const result = await signIn('credentials', {
         email,
         redirect: false,
       });

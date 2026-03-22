@@ -4,7 +4,7 @@ import { getAuthContext } from '@/lib/auth-helpers';
 import {
   getAppointmentById,
   updateAppointment,
-} from '@/services/appointment.service';
+} from '@/services/appointment';
 import { UpdateAppointmentSchema } from '@/validations/appointment.validation';
 
 type RouteContext = {

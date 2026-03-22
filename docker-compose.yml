@@ -24,7 +24,7 @@ services:
     command: start-dev
     environment:
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres17:5432/therapy_clinic_dev
+      KC_DB_URL: jdbc:postgresql://postgres:5432/therapy_clinic_dev
       KC_DB_USERNAME: postgres
       KC_DB_PASSWORD: postgres
       KC_HOSTNAME: localhost
@@ -44,6 +44,18 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+
+  redis:
+    image: redis:7-alpine
+    container_name: therapy-clinic-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:

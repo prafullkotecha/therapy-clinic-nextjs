@@ -5,6 +5,13 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
 import { auth, signIn } from '@/lib/auth';
 
+const enabledProviders = (process.env.AUTH_PROVIDERS ?? 'keycloak')
+  .split(',')
+  .map(provider => provider.trim().toLowerCase())
+  .filter(Boolean);
+const useCredentialsProvider = enabledProviders.includes('credentials');
+const useKeycloakProvider = enabledProviders.includes('keycloak');
+
 type ISignInPageProps = {
   params: Promise<{ locale: string }>;
 };
@@ -51,21 +58,29 @@ export default async function SignInPage(props: ISignInPageProps) {
           </div>
 
           {/* Sign-in form */}
-          <form
-            action={async () => {
-              'use server';
-              await signIn('keycloak');
-            }}
-          >
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              fullWidth
+          {useKeycloakProvider && (
+            <form
+              action={async () => {
+                'use server';
+                await signIn('keycloak');
+              }}
             >
-              {t('sign_in_button')}
-            </Button>
-          </form>
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                fullWidth
+              >
+                {t('sign_in_button')}
+              </Button>
+            </form>
+          )}
+
+          {useCredentialsProvider && (
+            <div className="mt-4 rounded-md bg-blue-50 p-3 text-sm text-blue-800">
+              Credentials provider is enabled. Use the development login page for seeded users.
+            </div>
+          )}
 
           {/* Security notice */}
           <div className="mt-6 text-center">

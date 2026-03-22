@@ -1,7 +1,12 @@
 import { CalendarIcon, DocumentTextIcon, UsersIcon } from '@heroicons/react/24/outline';
 import { Card } from '@/components/ui/Card';
+import type { DashboardStats } from '@/services/dashboard.service';
 
-export function TherapistDashboard() {
+type TherapistDashboardProps = {
+  stats: DashboardStats;
+};
+
+export function TherapistDashboard({ stats }: TherapistDashboardProps) {
   return (
     <div className="space-y-6">
       <div>
@@ -20,7 +25,7 @@ export function TherapistDashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Today&apos;s Appointments</p>
-              <p className="text-2xl font-bold text-gray-900">7</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.todaysAppointments}</p>
             </div>
           </div>
         </Card>
@@ -32,7 +37,7 @@ export function TherapistDashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Assigned Clients</p>
-              <p className="text-2xl font-bold text-gray-900">32</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.assignedClients}</p>
             </div>
           </div>
         </Card>
