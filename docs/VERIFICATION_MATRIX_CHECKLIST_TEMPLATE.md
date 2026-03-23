@@ -217,9 +217,14 @@ This template is the concrete verification matrix to approve before implementing
 - [ ] Credentials auth validates DB users securely
 - [ ] Session shape stays consistent across providers
 - [ ] Failed login protections and audit logging are implemented
-- [ ] Password policy follows industry baseline (minimum length + complexity + breached/common-password rejection where implemented)
-- [ ] Lockout policy follows industry baseline (temporary lock after repeated failures)
-- [ ] Rate-limiting policy follows industry baseline (per-account and/or per-IP throttling)
+- [ ] Password policy references NIST SP 800-63B §5.1.1 and OWASP ASVS v4.0.3 V2 controls
+- [ ] Password minimum length is 12+ characters and passphrases are allowed
+- [ ] Known-compromised/common passwords are rejected
+- [ ] No periodic forced password rotation unless compromise is indicated
+- [ ] Lockout/backoff follows OWASP ASVS v4.0.3 V2 anti-automation controls
+- [ ] Auth error responses are anti-enumeration safe during lockout/backoff conditions
+- [ ] Rate limiting follows OWASP ASVS v4.0.3 V2 anti-automation controls
+- [ ] Both per-account and per-IP throttling are applied on auth endpoints
 
 ### Automated Verification Checklist
 - [ ] Provider configuration tests pass
@@ -233,7 +238,11 @@ This template is the concrete verification matrix to approve before implementing
 - [ ] Redacted session payload examples
 
 ### Blockers / Inputs
-- [ ] Thresholds chosen using documented industry best practices and recorded in issue notes
+- [ ] Failed-attempt threshold value is documented in issue notes and PR description
+- [ ] Lock duration and/or progressive backoff schedule is documented in issue notes and PR description
+- [ ] Per-account rate-limit window and max request count are documented in issue notes and PR description
+- [ ] Per-IP rate-limit window and max request count are documented in issue notes and PR description
+- [ ] Documentation cites NIST SP 800-63B and OWASP ASVS references used
 
 ---
 
@@ -241,7 +250,7 @@ This template is the concrete verification matrix to approve before implementing
 
 ### Scope Checklist
 - [ ] Storybook setup supports current stack
-- [ ] Stories exist for approved component inventory derived from shadcn-aligned component set used by this codebase
+- [ ] Stories exist for approved component inventory derived from the component exports under `src/components/ui/` (`src/components/ui/index.ts` as canonical list)
 - [ ] Controls/docs are configured
 - [ ] Accessibility addon coverage is in place
 
@@ -256,7 +265,7 @@ This template is the concrete verification matrix to approve before implementing
 - [ ] Screenshots for representative stories
 
 ### Blockers / Inputs
-- [ ] Component inventory source-of-truth is the repository’s adopted shadcn-style component set; `component.gallery` may be used as reference inspiration only
+- [ ] Component inventory source-of-truth is the repository’s component exports under `src/components/ui/`; `component.gallery` may be used as reference inspiration only
 
 ---
 
