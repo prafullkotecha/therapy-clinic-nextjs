@@ -2,13 +2,19 @@ import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
-import { getEnabledAuthProviders } from '@/lib/auth-providers';
+import { getAuthProviderConfig } from '@/lib/auth-providers';
 import { Card, CardBody } from '@/components/ui/Card';
 import { auth, signIn } from '@/lib/auth';
 
-const enabledProviders = getEnabledAuthProviders(process.env.AUTH_PROVIDERS);
-const useCredentialsProvider = enabledProviders.includes('credentials');
-const useKeycloakProvider = enabledProviders.includes('keycloak');
+const {
+  isDevBypassEnabled,
+  useCredentialsProvider,
+  useKeycloakProvider,
+} = getAuthProviderConfig({
+  authProviders: process.env.AUTH_PROVIDERS,
+  devBypassAuth: process.env.DEV_BYPASS_AUTH,
+  nodeEnv: process.env.NODE_ENV,
+});
 
 type ISignInPageProps = {
   params: Promise<{ locale: string }>;
@@ -74,7 +80,7 @@ export default async function SignInPage(props: ISignInPageProps) {
             </form>
           )}
 
-          {useCredentialsProvider && (
+          {useCredentialsProvider && isDevBypassEnabled && (
             <div className="mt-4 rounded-md bg-blue-50 p-3 text-sm text-blue-800">
               Credentials provider is enabled. Use the development login page for seeded users.
             </div>

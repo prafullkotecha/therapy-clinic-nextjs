@@ -3,7 +3,7 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import Keycloak from 'next-auth/providers/keycloak';
 import { getAuthRequestContext } from '@/lib/auth-context';
-import { getEnabledAuthProviders } from '@/lib/auth-providers';
+import { getAuthProviderConfig } from '@/lib/auth-providers';
 import { DEV_BYPASS_TOKEN } from '@/lib/constants';
 import { db } from '@/libs/DB';
 import { Env } from '@/libs/Env';
@@ -12,10 +12,15 @@ import { logLoginSuccess } from '@/services/audit.service';
 import { clearFailedAttempts, isAccountLocked } from '@/services/lockout.service';
 
 // Development auth bypass - only enabled when DEV_BYPASS_AUTH=true and NODE_ENV=development
-const isDevBypassEnabled = Env.DEV_BYPASS_AUTH === 'true' && Env.NODE_ENV === 'development';
-const enabledProviders = getEnabledAuthProviders(Env.AUTH_PROVIDERS);
-const useCredentialsProvider = isDevBypassEnabled || enabledProviders.includes('credentials');
-const useKeycloakProvider = enabledProviders.includes('keycloak') && !isDevBypassEnabled;
+const {
+  isDevBypassEnabled,
+  useCredentialsProvider,
+  useKeycloakProvider,
+} = getAuthProviderConfig({
+  authProviders: Env.AUTH_PROVIDERS,
+  devBypassAuth: Env.DEV_BYPASS_AUTH,
+  nodeEnv: Env.NODE_ENV,
+});
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true, // Required for localhost in development

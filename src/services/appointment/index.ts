@@ -1140,6 +1140,9 @@ export async function processWaitlist(
   tenantId: string,
   therapistId: string,
   date: string,
+  dependencies?: {
+    getAvailableSlotsFn?: typeof getAvailableSlots;
+  },
 ): Promise<void> {
   return withTenantContext(tenantId, async () => {
     const { sendWaitlistNotification } = await import('../notification.service');
@@ -1168,7 +1171,8 @@ export async function processWaitlist(
     }
 
     // Get available slots for this therapist on the cancelled date
-    const availableSlots = await getAvailableSlots(
+    const getSlots = dependencies?.getAvailableSlotsFn ?? getAvailableSlots;
+    const availableSlots = await getSlots(
       tenantId,
       therapistId,
       date,

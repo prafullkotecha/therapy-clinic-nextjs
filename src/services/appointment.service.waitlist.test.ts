@@ -117,24 +117,18 @@ describe('Waitlist Processing', () => {
         'standard',
       );
 
-      vi.mock('./appointment', async (importOriginal) => {
-        const original = await importOriginal<typeof import('./appointment')>();
-        return {
-          ...original,
-          getAvailableSlots: vi.fn().mockResolvedValue([
-            {
-              startTime: '09:00',
-              endTime: '10:00',
-              therapistId: testTherapistId,
-              therapistName: 'Test Therapist',
-              locationId: 'location-1',
-            },
-          ]),
-        };
-      });
-
       // Process waitlist
-      await processWaitlist(testTenantId, testTherapistId, testDate);
+      await processWaitlist(testTenantId, testTherapistId, testDate, {
+        getAvailableSlotsFn: vi.fn().mockResolvedValue([
+          {
+            startTime: '09:00',
+            endTime: '10:00',
+            therapistId: testTherapistId,
+            therapistName: 'Test Therapist',
+            locationId: 'location-1',
+          },
+        ]),
+      });
 
       // Verify notification was sent (implementation would check mock)
       // This is a placeholder - full implementation would verify sendWaitlistNotification was called
@@ -213,17 +207,11 @@ describe('Waitlist Processing', () => {
         'standard',
       );
 
-      vi.mock('./appointment', async (importOriginal) => {
-        const original = await importOriginal<typeof import('./appointment')>();
-        return {
-          ...original,
-          getAvailableSlots: vi.fn().mockResolvedValue([]),
-        };
-      });
-
       // Should not throw error
       await expect(
-        processWaitlist(testTenantId, testTherapistId, testDate),
+        processWaitlist(testTenantId, testTherapistId, testDate, {
+          getAvailableSlotsFn: vi.fn().mockResolvedValue([]),
+        }),
       ).resolves.not.toThrow();
     });
 

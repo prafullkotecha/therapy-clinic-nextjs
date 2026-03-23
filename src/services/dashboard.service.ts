@@ -6,7 +6,6 @@ import { db } from '@/libs/DB';
 import { appointments } from '@/models/appointment.schema';
 import { clients } from '@/models/client.schema';
 import { therapists } from '@/models/therapist.schema';
-import { users } from '@/models/user.schema';
 
 export type DashboardStats = {
   totalClients: number;
@@ -14,13 +13,17 @@ export type DashboardStats = {
   assignedClients: number;
 };
 
+export function getTodayDateString(date: Date = new Date()): string {
+  return date.toISOString().split('T')[0]!;
+}
+
 export async function getDashboardStats(
   tenantId: string,
   userId: string,
   userRole: UserRole,
 ): Promise<DashboardStats> {
   return withTenantContext(tenantId, async () => {
-    const today = new Date().toISOString().split('T')[0]!;
+    const today = getTodayDateString();
 
     const [clientCountRow] = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -67,11 +70,11 @@ export async function getDashboardStats(
     } else {
       const [assignedCountRow] = await db
         .select({ count: sql<number>`count(*)::int` })
-        .from(users)
+        .from(clients)
         .where(
           and(
-            eq(users.tenantId, tenantId),
-            eq(users.isActive, true),
+            eq(clients.tenantId, tenantId),
+            sql`${clients.assignedTherapistId} IS NOT NULL`,
           ),
         );
 

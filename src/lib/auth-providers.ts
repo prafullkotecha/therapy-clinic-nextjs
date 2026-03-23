@@ -4,3 +4,23 @@ export function getEnabledAuthProviders(rawProviders: string | undefined): strin
     .map(provider => provider.trim().toLowerCase())
     .filter(Boolean);
 }
+
+export function getAuthProviderConfig(input: {
+  authProviders: string | undefined;
+  devBypassAuth: string | undefined;
+  nodeEnv: string | undefined;
+}): {
+  isDevBypassEnabled: boolean;
+  useCredentialsProvider: boolean;
+  useKeycloakProvider: boolean;
+} {
+  const enabledProviders = getEnabledAuthProviders(input.authProviders);
+  const isDevBypassEnabled
+    = input.devBypassAuth === 'true' && input.nodeEnv === 'development';
+
+  return {
+    isDevBypassEnabled,
+    useCredentialsProvider: isDevBypassEnabled,
+    useKeycloakProvider: enabledProviders.includes('keycloak') && !isDevBypassEnabled,
+  };
+}
