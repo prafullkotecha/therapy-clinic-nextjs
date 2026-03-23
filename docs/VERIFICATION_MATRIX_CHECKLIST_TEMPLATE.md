@@ -12,6 +12,13 @@ This template is the concrete verification matrix to approve before implementing
 - [ ] App startup verification completed when runtime behavior is in scope
 - [ ] Evidence captured (command output, logs, screenshots where UI is changed)
 
+### Evidence Format Guidance (Applicable / Appropriate)
+
+- [ ] Command logs are required for all automated checks
+- [ ] Screenshots are required only for UI-impacting changes
+- [ ] CI run links are required when verification is executed in CI
+- [ ] PR note summarizes which evidence types were applicable and why
+
 ## Priority Order (Fixed)
 
 1. #176
@@ -175,7 +182,7 @@ This template is the concrete verification matrix to approve before implementing
 - [ ] Test logs for factories/seeding
 
 ### Blockers / Inputs
-- [ ] Confirm whether phase-2 entities are in current scope
+- [ ] Phase 2 is in scope for this issue and included in verification
 
 ---
 
@@ -210,19 +217,23 @@ This template is the concrete verification matrix to approve before implementing
 - [ ] Credentials auth validates DB users securely
 - [ ] Session shape stays consistent across providers
 - [ ] Failed login protections and audit logging are implemented
+- [ ] Password policy follows industry baseline (minimum length + complexity + breached/common-password rejection where implemented)
+- [ ] Lockout policy follows industry baseline (temporary lock after repeated failures)
+- [ ] Rate-limiting policy follows industry baseline (per-account and/or per-IP throttling)
 
 ### Automated Verification Checklist
 - [ ] Provider configuration tests pass
 - [ ] Credentials success/failure tests pass
 - [ ] Lockout/rate-limit tests pass
 - [ ] Audit-log assertion tests pass
+- [ ] Password policy tests pass (accept strong, reject weak/common patterns)
 
 ### Evidence
 - [ ] Auth test logs
 - [ ] Redacted session payload examples
 
 ### Blockers / Inputs
-- [ ] Final lockout/rate-limit/password policy thresholds
+- [ ] Thresholds chosen using documented industry best practices and recorded in issue notes
 
 ---
 
@@ -230,7 +241,7 @@ This template is the concrete verification matrix to approve before implementing
 
 ### Scope Checklist
 - [ ] Storybook setup supports current stack
-- [ ] Stories exist for approved component inventory
+- [ ] Stories exist for approved component inventory derived from shadcn-aligned component set used by this codebase
 - [ ] Controls/docs are configured
 - [ ] Accessibility addon coverage is in place
 
@@ -245,7 +256,7 @@ This template is the concrete verification matrix to approve before implementing
 - [ ] Screenshots for representative stories
 
 ### Blockers / Inputs
-- [ ] Final source-of-truth list for required components
+- [ ] Component inventory source-of-truth is the repository’s adopted shadcn-style component set; `component.gallery` may be used as reference inspiration only
 
 ---
 
