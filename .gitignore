@@ -64,3 +64,4 @@ build-archive.log
 # Worktrees (parallel workflow system)
 /worktrees/
 .worktree-assignments.json
+keycloak-with-postgres-docker-command.md
