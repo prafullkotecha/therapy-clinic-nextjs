@@ -64,7 +64,7 @@ export function TherapistDashboard({ stats }: TherapistDashboardProps) {
           {stats.recentActivity.length > 0
             ? (
                 <ul className="space-y-3">
-                  {stats.recentActivity.slice(0, 5).map(activity => (
+                  {stats.recentActivity.map(activity => (
                     <li key={activity.id} className="rounded-md border border-gray-100 p-3">
                       <p className="text-sm font-medium text-gray-900">
                         {activity.action}

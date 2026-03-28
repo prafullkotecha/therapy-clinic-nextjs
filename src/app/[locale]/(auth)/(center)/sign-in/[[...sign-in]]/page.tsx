@@ -119,6 +119,7 @@ export default async function SignInPage(props: ISignInPageProps) {
                     minLength={12}
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                   />
+                  <p className="mt-1 text-xs text-gray-500">Minimum 12 characters.</p>
                 </div>
                 <Button
                   type="submit"

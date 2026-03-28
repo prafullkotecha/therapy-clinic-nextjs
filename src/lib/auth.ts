@@ -43,6 +43,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
               const email = String(credentials.email).toLowerCase().trim();
               const password = String(credentials.password);
+              if (password.length < 12) {
+                return null;
+              }
 
               // Fetch user from database
               const [dbUser] = await db
@@ -68,9 +71,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
               if (passwordHash) {
                 isValidPassword = await verifyPassword(password, passwordHash);
-              } else if (isDevBypassEnabled) {
-                // Backward-compatible development fallback for older seed data
-                isValidPassword = password.length > 0;
               }
 
               if (!isValidPassword) {

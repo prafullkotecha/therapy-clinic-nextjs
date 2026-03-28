@@ -21,7 +21,12 @@ export type DashboardStats = {
 };
 
 const CACHE_TTL_MS = 60_000;
+const RECENT_ACTIVITY_LIMIT = 5;
 const dashboardStatsCache = new Map<string, { expiresAt: number; value: DashboardStats }>();
+// NOTE: This in-memory cache is process-local and best-effort.
+// In multi-instance deployments, each instance has its own cache.
+// For globally consistent caching across instances, use Redis.
+// Cache invalidation currently relies on TTL expiry only.
 
 export function getTodayDateString(date: Date = new Date()): string {
   return date.toISOString().split('T')[0]!;
@@ -71,7 +76,7 @@ export async function getDashboardStats(
       .from(auditLogs)
       .where(recentActivityWhere)
       .orderBy(desc(auditLogs.timestamp))
-      .limit(8);
+      .limit(RECENT_ACTIVITY_LIMIT);
 
     let assignedClients = 0;
 

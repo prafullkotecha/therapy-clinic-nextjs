@@ -1,5 +1,8 @@
 import { randomBytes, scrypt as nodeScrypt, scryptSync, timingSafeEqual } from 'node:crypto';
 
+// OWASP-recommended interactive login baseline for scrypt (2024):
+// N=2^14, r=8, p=1. This provides strong password hashing resistance
+// while keeping authentication latency practical for web sign-in flows.
 const SCRYPT_N = 16384;
 const SCRYPT_R = 8;
 const SCRYPT_P = 1;
