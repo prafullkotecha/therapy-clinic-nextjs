@@ -14,6 +14,7 @@ import type { PHIEncryptionService } from '@/lib/encryption';
 import { faker } from '@faker-js/faker';
 import { eq } from 'drizzle-orm';
 import { getEncryptionService } from '@/lib/encryption';
+import { hashPasswordSync } from '@/lib/password';
 import { db } from '@/libs/DB';
 
 import { appointments } from '@/models/appointment.schema';
@@ -378,12 +379,13 @@ async function seedUsers(
     .insert(users)
     .values(
       userData.map(u =>
-        userFactory.build({
-          ...u,
-          tenantId,
-          isActive: true,
-          mfaEnabled: false,
-        }),
+      userFactory.build({
+        ...u,
+        tenantId,
+        passwordHash: hashPasswordSync('Password123!@#'),
+        isActive: true,
+        mfaEnabled: false,
+      }),
       ),
     )
     .returning({ id: users.id, email: users.email });

@@ -61,7 +61,28 @@ export function TherapistDashboard({ stats }: TherapistDashboardProps) {
           <h2 className="text-lg font-semibold text-gray-900">Today&apos;s Schedule</h2>
         </div>
         <div className="px-6 py-8">
-          <p className="text-gray-600">Appointment schedule will be populated with real data in Phase 3</p>
+          {stats.recentActivity.length > 0
+            ? (
+                <ul className="space-y-3">
+                  {stats.recentActivity.slice(0, 5).map(activity => (
+                    <li key={activity.id} className="rounded-md border border-gray-100 p-3">
+                      <p className="text-sm font-medium text-gray-900">
+                        {activity.action}
+                        {' '}
+                        ·
+                        {' '}
+                        {activity.resource}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {new Date(activity.timestamp).toLocaleString()}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )
+            : (
+                <p className="text-gray-600">No schedule activity yet.</p>
+              )}
         </div>
       </Card>
     </div>

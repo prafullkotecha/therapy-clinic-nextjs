@@ -61,7 +61,28 @@ export function AdminDashboard({ stats }: AdminDashboardProps) {
           <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
         </div>
         <div className="px-6 py-8">
-          <p className="text-gray-600">Activity feed will be populated with real data in Phase 3</p>
+          {stats.recentActivity.length > 0
+            ? (
+                <ul className="space-y-3">
+                  {stats.recentActivity.map(activity => (
+                    <li key={activity.id} className="rounded-md border border-gray-100 p-3">
+                      <p className="text-sm font-medium text-gray-900">
+                        {activity.action}
+                        {' '}
+                        ·
+                        {' '}
+                        {activity.resource}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {new Date(activity.timestamp).toLocaleString()}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )
+            : (
+                <p className="text-gray-600">No recent activity yet.</p>
+              )}
         </div>
       </Card>
     </div>

@@ -66,6 +66,7 @@ export default function DevLoginPage(): React.JSX.Element {
     try {
       const result = await signIn('credentials', {
         email,
+        password: 'Password123!@#',
         redirect: false,
       });
 
@@ -141,6 +142,7 @@ export default function DevLoginPage(): React.JSX.Element {
                   <p className="text-sm font-medium">{user.name}</p>
                   <p className="mt-2 text-xs">{user.description}</p>
                   <p className="mt-2 font-mono text-xs">{user.email}</p>
+                  <p className="font-mono text-xs">Password123!@#</p>
 
                   <button
                     type="button"

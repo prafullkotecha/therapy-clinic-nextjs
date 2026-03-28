@@ -20,7 +20,7 @@ export function getAuthProviderConfig(input: {
 
   return {
     isDevBypassEnabled,
-    useCredentialsProvider: isDevBypassEnabled,
+    useCredentialsProvider: enabledProviders.includes('credentials') || isDevBypassEnabled,
     useKeycloakProvider: enabledProviders.includes('keycloak') && !isDevBypassEnabled,
   };
 }

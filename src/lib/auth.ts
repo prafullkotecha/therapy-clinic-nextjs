@@ -5,11 +5,12 @@ import Keycloak from 'next-auth/providers/keycloak';
 import { getAuthRequestContext } from '@/lib/auth-context';
 import { getAuthProviderConfig } from '@/lib/auth-providers';
 import { DEV_BYPASS_TOKEN } from '@/lib/constants';
+import { verifyPassword } from '@/lib/password';
 import { db } from '@/libs/DB';
 import { Env } from '@/libs/Env';
 import { users } from '@/models/user.schema';
-import { logLoginSuccess } from '@/services/audit.service';
-import { clearFailedAttempts, isAccountLocked } from '@/services/lockout.service';
+import { logLoginFailed, logLoginSuccess } from '@/services/audit.service';
+import { checkAndLockAccount, clearFailedAttempts, isAccountLocked, recordFailedLoginAttempt } from '@/services/lockout.service';
 
 // Development auth bypass - only enabled when DEV_BYPASS_AUTH=true and NODE_ENV=development
 const {
@@ -32,21 +33,63 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             id: 'credentials',
             name: isDevBypassEnabled ? 'Development Bypass' : 'Credentials',
             credentials: {
-              email: { label: 'Email', type: 'text' },
+              email: { label: 'Email', type: 'email' },
+              password: { label: 'Password', type: 'password' },
             },
             async authorize(credentials) {
-              if (!credentials?.email) {
+              if (!credentials?.email || !credentials?.password) {
                 return null;
               }
+
+              const email = String(credentials.email).toLowerCase().trim();
+              const password = String(credentials.password);
 
               // Fetch user from database
               const [dbUser] = await db
                 .select()
                 .from(users)
-                .where(eq(users.email, credentials.email as string))
+                .where(eq(users.email, email))
                 .limit(1);
 
               if (!dbUser || !dbUser.isActive) {
+                return null;
+              }
+
+              // Check account lockout first to avoid unnecessary verification
+              const locked = await isAccountLocked(dbUser.tenantId, email, 'email');
+              if (locked) {
+                return null;
+              }
+
+              const { ipAddress, userAgent } = await getAuthRequestContext();
+
+              const passwordHash = dbUser.passwordHash;
+              let isValidPassword = false;
+
+              if (passwordHash) {
+                isValidPassword = await verifyPassword(password, passwordHash);
+              } else if (isDevBypassEnabled) {
+                // Backward-compatible development fallback for older seed data
+                isValidPassword = password.length > 0;
+              }
+
+              if (!isValidPassword) {
+                await recordFailedLoginAttempt(
+                  dbUser.tenantId,
+                  email,
+                  'email',
+                  ipAddress,
+                  userAgent,
+                  'invalid_credentials',
+                );
+                await logLoginFailed(
+                  dbUser.tenantId,
+                  email,
+                  ipAddress,
+                  userAgent,
+                  'invalid_credentials',
+                );
+                await checkAndLockAccount(dbUser.tenantId, email, ipAddress, userAgent);
                 return null;
               }
 
@@ -79,10 +122,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       try {
         // Credentials provider in development bypass mode
         if (account?.provider === 'credentials') {
-          if (!isDevBypassEnabled) {
-            return false;
-          }
-
           // User is already fetched and validated in authorize()
           // Access tenantId and email from user object (no need to re-fetch)
           const tenantId = user.tenantId as string;

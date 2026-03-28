@@ -244,7 +244,7 @@ npm run db:reset
 
 **Demo Accounts:**
 
-After seeding, you can use these accounts for testing (requires Keycloak setup):
+After seeding, you can use these accounts for testing:
 
 - **Admin:** admin@brightfutures.test
 - **Therapists:**
@@ -253,6 +253,19 @@ After seeding, you can use these accounts for testing (requires Keycloak setup):
   - emma.rodriguez@brightfutures.test (Trauma/EMDR specialist)
 - **Billing:** lisa.anderson@brightfutures.test
 - **Receptionist:** james.wilson@brightfutures.test
+- **Default seeded password (Credentials provider):** `Password123!@#`
+
+You can enable credentials login by setting:
+
+```shell
+AUTH_PROVIDERS=credentials
+```
+
+Or use both providers:
+
+```shell
+AUTH_PROVIDERS=keycloak,credentials
+```
 
 **Note:** All PHI (Protected Health Information) fields are encrypted using AES-256-GCM encryption. The seed script automatically handles encryption, so decrypted values will only be visible through the application UI or when using the encryption service.
 

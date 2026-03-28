@@ -9,6 +9,7 @@ const withTenantContextMock = vi.fn(async (tenantId: string, operation: (db: unk
 const selectMock = vi.fn();
 const fromMock = vi.fn();
 const whereMock = vi.fn();
+const orderByMock = vi.fn();
 const limitMock = vi.fn();
 
 vi.mock('@/lib/tenant-db', () => ({
@@ -43,11 +44,20 @@ describe('dashboard.service', () => {
   });
 
   it('should return therapist-specific assigned client count', async () => {
-    limitMock.mockReset().mockResolvedValueOnce([{ id: 'therapist-1' }]);
+    const therapistLimitMock = vi.fn().mockResolvedValueOnce([{ id: 'therapist-1' }]);
+    limitMock.mockReset()
+      .mockResolvedValueOnce([{
+        id: 'activity-1',
+        action: 'login_success',
+        resource: 'authentication',
+        timestamp: new Date('2026-03-23T10:00:00.000Z'),
+      }]);
+    orderByMock.mockReset().mockReturnValue({ limit: limitMock });
     whereMock.mockReset()
       .mockResolvedValueOnce([{ count: 8 }])
       .mockResolvedValueOnce([{ count: 3 }])
-      .mockImplementationOnce(() => ({ limit: limitMock }))
+      .mockImplementationOnce(() => ({ orderBy: orderByMock }))
+      .mockImplementationOnce(() => ({ limit: therapistLimitMock }))
       .mockResolvedValueOnce([{ count: 5 }]);
     fromMock.mockReset().mockReturnValue({ where: whereMock });
     selectMock.mockReset().mockReturnValue({ from: fromMock });
@@ -58,13 +68,22 @@ describe('dashboard.service', () => {
       totalClients: 8,
       todaysAppointments: 3,
       assignedClients: 5,
+      recentActivity: [{
+        id: 'activity-1',
+        action: 'login_success',
+        resource: 'authentication',
+        timestamp: new Date('2026-03-23T10:00:00.000Z'),
+      }],
     });
   });
 
   it('should return non-therapist assigned client count', async () => {
+    limitMock.mockReset().mockResolvedValueOnce([]);
+    orderByMock.mockReset().mockReturnValue({ limit: limitMock });
     whereMock.mockReset()
       .mockResolvedValueOnce([{ count: 12 }])
       .mockResolvedValueOnce([{ count: 7 }])
+      .mockImplementationOnce(() => ({ orderBy: orderByMock }))
       .mockResolvedValueOnce([{ count: 9 }]);
     fromMock.mockReset().mockReturnValue({ where: whereMock });
     selectMock.mockReset().mockReturnValue({ from: fromMock });
@@ -75,6 +94,7 @@ describe('dashboard.service', () => {
       totalClients: 12,
       todaysAppointments: 7,
       assignedClients: 9,
+      recentActivity: [],
     });
   });
 });

@@ -36,6 +36,7 @@ export default async function DashboardPage() {
         totalClients: 0,
         todaysAppointments: 0,
         assignedClients: 0,
+        recentActivity: [],
       };
 
   // Render role-specific dashboard

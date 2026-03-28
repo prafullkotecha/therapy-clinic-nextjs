@@ -4,8 +4,6 @@ import { DashboardShell } from '@/components/layout/DashboardShell';
 import { auth } from '@/lib/auth';
 import { extractPrimaryRole } from '@/lib/role-utils';
 
-export const dynamic = 'force-dynamic';
-
 export default async function TherapistsLayout(props: {
   children: React.ReactNode;
   params: Promise<{ locale: string }>;

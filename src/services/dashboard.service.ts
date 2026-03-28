@@ -1,17 +1,27 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { withTenantContext } from '@/lib/tenant-db';
 import type { UserRole } from '@/lib/rbac';
 import { UserRoles } from '@/lib/rbac';
 import { db } from '@/libs/DB';
 import { appointments } from '@/models/appointment.schema';
 import { clients } from '@/models/client.schema';
+import { auditLogs } from '@/models/user.schema';
 import { therapists } from '@/models/therapist.schema';
 
 export type DashboardStats = {
   totalClients: number;
   todaysAppointments: number;
   assignedClients: number;
+  recentActivity: {
+    id: string;
+    action: string;
+    resource: string;
+    timestamp: Date;
+  }[];
 };
+
+const CACHE_TTL_MS = 60_000;
+const dashboardStatsCache = new Map<string, { expiresAt: number; value: DashboardStats }>();
 
 export function getTodayDateString(date: Date = new Date()): string {
   return date.toISOString().split('T')[0]!;
@@ -22,7 +32,14 @@ export async function getDashboardStats(
   userId: string,
   userRole: UserRole,
 ): Promise<DashboardStats> {
-  return withTenantContext(tenantId, async () => {
+  const cacheKey = `${tenantId}:${userId}:${userRole}`;
+  const now = Date.now();
+  const cached = dashboardStatsCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) {
+    return cached.value;
+  }
+
+  const stats = await withTenantContext(tenantId, async () => {
     const today = getTodayDateString();
 
     const [clientCountRow] = await db
@@ -39,6 +56,22 @@ export async function getDashboardStats(
           eq(appointments.appointmentDate, today),
         ),
       );
+
+    const recentActivityWhere = userRole === UserRoles.THERAPIST
+      ? and(eq(auditLogs.tenantId, tenantId), eq(auditLogs.userId, userId))
+      : eq(auditLogs.tenantId, tenantId);
+
+    const recentActivity = await db
+      .select({
+        id: auditLogs.id,
+        action: auditLogs.action,
+        resource: auditLogs.resource,
+        timestamp: auditLogs.timestamp,
+      })
+      .from(auditLogs)
+      .where(recentActivityWhere)
+      .orderBy(desc(auditLogs.timestamp))
+      .limit(8);
 
     let assignedClients = 0;
 
@@ -85,6 +118,14 @@ export async function getDashboardStats(
       totalClients: clientCountRow?.count ?? 0,
       todaysAppointments: todaysAppointmentsRow?.count ?? 0,
       assignedClients,
+      recentActivity,
     };
   });
+
+  dashboardStatsCache.set(cacheKey, {
+    expiresAt: now + CACHE_TTL_MS,
+    value: stats,
+  });
+
+  return stats;
 }
