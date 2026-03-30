@@ -29,5 +29,6 @@ declare module 'next-auth/jwt' {
     tenantId?: string;
     accessToken?: string;
     idToken?: string;
+    authProvider?: 'credentials' | 'keycloak';
   }
 }

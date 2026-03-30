@@ -5,8 +5,6 @@ import { auth } from '@/lib/auth';
 import { UserRoles } from '@/lib/rbac';
 import { extractPrimaryRole } from '@/lib/role-utils';
 
-export const dynamic = 'force-dynamic';
-
 export default async function AdminLayout(props: {
   children: React.ReactNode;
   params: Promise<{ locale: string }>;

@@ -16,6 +16,10 @@ const isAuthRoute = (pathname: string) => {
   return pathname.includes('/api/auth');
 };
 
+const isDevLoginRoute = (pathname: string) => {
+  return pathname.endsWith('/dev-login');
+};
+
 // Improve security with Arcjet
 const aj = arcjet.withRule(
   detectBot({
@@ -84,6 +88,19 @@ export default async function middleware(
   if (isAuthRoute(request.nextUrl.pathname)) {
     const response = NextResponse.next();
     return captureRequestContext(request, response);
+  }
+
+  // Restrict development login page to explicit local development bypass mode
+  if (isDevLoginRoute(request.nextUrl.pathname)) {
+    const isDevBypassEnabled
+      = process.env.DEV_BYPASS_AUTH === 'true' && process.env.NODE_ENV === 'development';
+    if (!isDevBypassEnabled) {
+      const url = request.nextUrl.clone();
+      const locale = url.pathname.match(/^\/([^/]+)/)?.at(1);
+      const safeLocale = locale && routing.locales.includes(locale) ? locale : routing.defaultLocale;
+      url.pathname = `/${safeLocale}/sign-in`;
+      return NextResponse.redirect(url);
+    }
   }
 
   // Check authentication for protected routes

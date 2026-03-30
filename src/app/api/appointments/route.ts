@@ -4,7 +4,7 @@ import { getAuthContext } from '@/lib/auth-helpers';
 import {
   createAppointment,
   getAppointments,
-} from '@/services/appointment.service';
+} from '@/services/appointment';
 import {
   AppointmentQueryParamsSchema,
   CreateAppointmentSchema,

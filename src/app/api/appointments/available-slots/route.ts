@@ -6,7 +6,7 @@ import {
   MIN_APPOINTMENT_DURATION_MINUTES,
 } from '@/constants/appointments';
 import { getAuthContext } from '@/lib/auth-helpers';
-import { getAvailableSlots } from '@/services/appointment.service';
+import { getAvailableSlots } from '@/services/appointment';
 
 /**
  * GET /api/appointments/available-slots

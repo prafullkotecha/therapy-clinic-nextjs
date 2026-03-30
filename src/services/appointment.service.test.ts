@@ -5,7 +5,7 @@ import {
   getAvailableSlots,
   getAvailableSlotsRange,
   slotsOverlap,
-} from './appointment.service';
+} from './appointment';
 
 // Mock dependencies
 vi.mock('@/lib/tenant-db');

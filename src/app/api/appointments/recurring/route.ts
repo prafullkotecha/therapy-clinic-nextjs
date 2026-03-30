@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth-helpers';
-import { createRecurringAppointments } from '@/services/appointment.service';
+import { createRecurringAppointments } from '@/services/appointment';
 import { RecurringAppointmentSchema } from '@/validations/appointment.validation';
 
 /**

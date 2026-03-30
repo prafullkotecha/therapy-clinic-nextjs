@@ -3,38 +3,48 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import Keycloak from 'next-auth/providers/keycloak';
 import { getAuthRequestContext } from '@/lib/auth-context';
+import { getSignOutLookupStrategy } from '@/lib/auth-audit';
+import { getAuthProviderConfig } from '@/lib/auth-providers';
 import { DEV_BYPASS_TOKEN } from '@/lib/constants';
+import { verifyPassword } from '@/lib/password';
 import { db } from '@/libs/DB';
 import { Env } from '@/libs/Env';
 import { users } from '@/models/user.schema';
-import { logLoginSuccess } from '@/services/audit.service';
-import { clearFailedAttempts, isAccountLocked } from '@/services/lockout.service';
+import { logLoginFailed, logLoginSuccess } from '@/services/audit.service';
+import { checkAndLockAccount, clearFailedAttempts, isAccountLocked, recordFailedLoginAttempt } from '@/services/lockout.service';
 
 // Development auth bypass - only enabled when DEV_BYPASS_AUTH=true and NODE_ENV=development
-const isDevBypassEnabled = Env.DEV_BYPASS_AUTH === 'true' && Env.NODE_ENV === 'development';
-
-// Production safety check
-if (Env.DEV_BYPASS_AUTH === 'true' && Env.NODE_ENV === 'production') {
-  throw new Error(
-    'SECURITY ERROR: DEV_BYPASS_AUTH cannot be enabled in production! '
-    + 'This would bypass all authentication and allow unauthorized access.',
-  );
-}
+const {
+  isDevBypassEnabled,
+  useCredentialsProvider,
+  useKeycloakProvider,
+} = getAuthProviderConfig({
+  authProviders: Env.AUTH_PROVIDERS,
+  devBypassAuth: Env.DEV_BYPASS_AUTH,
+  nodeEnv: Env.NODE_ENV,
+});
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true, // Required for localhost in development
   providers: [
-    // Development bypass provider - fetch real user from database by email
-    ...(isDevBypassEnabled
+    // Credentials provider (development bypass mode) - fetch real user from database by email
+    ...(useCredentialsProvider
       ? [
           Credentials({
-            id: 'dev-bypass',
-            name: 'Development Bypass',
+            id: 'credentials',
+            name: isDevBypassEnabled ? 'Development Bypass' : 'Credentials',
             credentials: {
-              email: { label: 'Email', type: 'text' },
+              email: { label: 'Email', type: 'email' },
+              password: { label: 'Password', type: 'password' },
             },
             async authorize(credentials) {
-              if (!credentials?.email) {
+              if (!credentials?.email || !credentials?.password) {
+                return null;
+              }
+
+              const email = String(credentials.email).toLowerCase().trim();
+              const password = String(credentials.password);
+              if (password.length < 12) {
                 return null;
               }
 
@@ -42,10 +52,45 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               const [dbUser] = await db
                 .select()
                 .from(users)
-                .where(eq(users.email, credentials.email as string))
+                .where(eq(users.email, email))
                 .limit(1);
 
               if (!dbUser || !dbUser.isActive) {
+                return null;
+              }
+
+              // Check account lockout first to avoid unnecessary verification
+              const locked = await isAccountLocked(dbUser.tenantId, email, 'email');
+              if (locked) {
+                return null;
+              }
+
+              const { ipAddress, userAgent } = await getAuthRequestContext();
+
+              const passwordHash = dbUser.passwordHash;
+              let isValidPassword = false;
+
+              if (passwordHash) {
+                isValidPassword = await verifyPassword(password, passwordHash);
+              }
+
+              if (!isValidPassword) {
+                await recordFailedLoginAttempt(
+                  dbUser.tenantId,
+                  email,
+                  'email',
+                  ipAddress,
+                  userAgent,
+                  'invalid_credentials',
+                );
+                await logLoginFailed(
+                  dbUser.tenantId,
+                  email,
+                  ipAddress,
+                  userAgent,
+                  'invalid_credentials',
+                );
+                await checkAndLockAccount(dbUser.tenantId, email, ipAddress, userAgent);
                 return null;
               }
 
@@ -62,7 +107,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         ]
       : []),
     // Keycloak provider (disabled in dev when bypass is enabled)
-    ...((!isDevBypassEnabled)
+    ...(useKeycloakProvider
       ? [
           Keycloak({
             clientId: process.env.KEYCLOAK_CLIENT_ID!,
@@ -76,8 +121,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async signIn({ user, account, profile }) {
       // Check account lockout and log successful login
       try {
-        // Dev bypass provider
-        if (account?.provider === 'dev-bypass') {
+        // Credentials provider in development bypass mode
+        if (account?.provider === 'credentials') {
           // User is already fetched and validated in authorize()
           // Access tenantId and email from user object (no need to re-fetch)
           const tenantId = user.tenantId as string;
@@ -156,19 +201,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, account, profile, user }) {
       // Persist additional user info in the JWT
       if (account) {
-        // Dev bypass provider
-        if (account.provider === 'dev-bypass' && user) {
+        // Credentials provider
+        if (account.provider === 'credentials' && user) {
           token.sub = user.id; // Set user ID in token.sub for NextAuth v5
           token.accessToken = DEV_BYPASS_TOKEN;
           token.idToken = DEV_BYPASS_TOKEN;
           token.roles = user.roles || [];
           token.tenantId = user.tenantId as string;
+          token.authProvider = 'credentials';
         } else if (profile) {
           // Keycloak provider
           token.accessToken = account.access_token;
           token.idToken = account.id_token;
           token.roles = (profile as any).realm_access?.roles || [];
           token.tenantId = (profile as any).tenant_id;
+          token.authProvider = 'keycloak';
         }
       }
       return token;
@@ -212,14 +259,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
 
         const tenantId = token?.tenantId as string | undefined;
-        const keycloakId = token?.sub as string | undefined;
+        const tokenSubject = token?.sub as string | undefined;
+        const lookupStrategy = getSignOutLookupStrategy({
+          authProvider: token?.authProvider,
+          accessToken: token?.accessToken as string | undefined,
+          nodeEnv: Env.NODE_ENV,
+        });
 
-        if (tenantId && keycloakId) {
+        if (lookupStrategy === 'skip') {
+          return;
+        }
+
+        if (tenantId && tokenSubject) {
           // Find user in our database
           const [dbUser] = await db
             .select()
             .from(users)
-            .where(eq(users.keycloakId, keycloakId))
+            .where(
+              lookupStrategy === 'id'
+                ? eq(users.id, tokenSubject)
+                : eq(users.keycloakId, tokenSubject),
+            )
             .limit(1);
 
           if (dbUser) {

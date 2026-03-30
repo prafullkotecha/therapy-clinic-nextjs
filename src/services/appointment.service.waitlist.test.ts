@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/libs/DB';
 import { appointments, waitlist } from '@/models/appointment.schema';
-import { addToWaitlist, processWaitlist } from './appointment.service';
+import { addToWaitlist, processWaitlist } from './appointment';
 
 // Mock the notification service
 vi.mock('./notification.service', () => ({
@@ -117,27 +117,18 @@ describe('Waitlist Processing', () => {
         'standard',
       );
 
-      // Mock getAvailableSlots to return available slots
-      const mockGetAvailableSlots = vi.fn().mockResolvedValue([
-        {
-          startTime: '09:00',
-          endTime: '10:00',
-          therapistId: testTherapistId,
-          therapistName: 'Test Therapist',
-          locationId: 'location-1',
-        },
-      ]);
-
-      vi.mock('./appointment.service', async (importOriginal) => {
-        const original = await importOriginal<typeof import('./appointment.service')>();
-        return {
-          ...original,
-          getAvailableSlots: mockGetAvailableSlots,
-        };
-      });
-
       // Process waitlist
-      await processWaitlist(testTenantId, testTherapistId, testDate);
+      await processWaitlist(testTenantId, testTherapistId, testDate, {
+        getAvailableSlotsFn: vi.fn().mockResolvedValue([
+          {
+            startTime: '09:00',
+            endTime: '10:00',
+            therapistId: testTherapistId,
+            therapistName: 'Test Therapist',
+            locationId: 'location-1',
+          },
+        ]),
+      });
 
       // Verify notification was sent (implementation would check mock)
       // This is a placeholder - full implementation would verify sendWaitlistNotification was called
@@ -216,20 +207,11 @@ describe('Waitlist Processing', () => {
         'standard',
       );
 
-      // Mock getAvailableSlots to return empty array
-      const mockGetAvailableSlots = vi.fn().mockResolvedValue([]);
-
-      vi.mock('./appointment.service', async (importOriginal) => {
-        const original = await importOriginal<typeof import('./appointment.service')>();
-        return {
-          ...original,
-          getAvailableSlots: mockGetAvailableSlots,
-        };
-      });
-
       // Should not throw error
       await expect(
-        processWaitlist(testTenantId, testTherapistId, testDate),
+        processWaitlist(testTenantId, testTherapistId, testDate, {
+          getAvailableSlotsFn: vi.fn().mockResolvedValue([]),
+        }),
       ).resolves.not.toThrow();
     });
 

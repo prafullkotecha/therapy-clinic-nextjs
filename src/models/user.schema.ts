@@ -7,6 +7,7 @@ export const users = pgTable('users', {
   tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
 
   keycloakId: varchar('keycloak_id', { length: 255 }).unique().notNull(),
+  passwordHash: text('password_hash'),
   email: varchar('email', { length: 255 }).notNull(),
   role: varchar('role', { length: 50 }).notNull(),
   // admin, therapist, billing, receptionist

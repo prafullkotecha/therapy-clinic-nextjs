@@ -1,7 +1,12 @@
 import { CalendarIcon, CreditCardIcon, UsersIcon } from '@heroicons/react/24/outline';
 import { Card } from '@/components/ui/Card';
+import type { DashboardStats } from '@/services/dashboard.service';
 
-export function AdminDashboard() {
+type AdminDashboardProps = {
+  stats: DashboardStats;
+};
+
+export function AdminDashboard({ stats }: AdminDashboardProps) {
   return (
     <div className="space-y-6">
       <div>
@@ -20,7 +25,7 @@ export function AdminDashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Clients</p>
-              <p className="text-2xl font-bold text-gray-900">142</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalClients}</p>
             </div>
           </div>
         </Card>
@@ -32,7 +37,7 @@ export function AdminDashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Today&apos;s Appointments</p>
-              <p className="text-2xl font-bold text-gray-900">23</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.todaysAppointments}</p>
             </div>
           </div>
         </Card>
@@ -56,7 +61,28 @@ export function AdminDashboard() {
           <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
         </div>
         <div className="px-6 py-8">
-          <p className="text-gray-600">Activity feed will be populated with real data in Phase 3</p>
+          {stats.recentActivity.length > 0
+            ? (
+                <ul className="space-y-3">
+                  {stats.recentActivity.map(activity => (
+                    <li key={activity.id} className="rounded-md border border-gray-100 p-3">
+                      <p className="text-sm font-medium text-gray-900">
+                        {activity.action}
+                        {' '}
+                        ·
+                        {' '}
+                        {activity.resource}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {new Date(activity.timestamp).toLocaleString()}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )
+            : (
+                <p className="text-gray-600">No recent activity yet.</p>
+              )}
         </div>
       </Card>
     </div>

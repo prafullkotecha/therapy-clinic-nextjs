@@ -7,6 +7,7 @@ import { TherapistDashboard } from '@/components/dashboards/TherapistDashboard';
 import { auth } from '@/lib/auth';
 import { UserRoles } from '@/lib/rbac';
 import { extractPrimaryRole } from '@/lib/role-utils';
+import { getDashboardStats } from '@/services/dashboard.service';
 
 export async function generateMetadata(props: {
   params: Promise<{ locale: string }>;
@@ -25,18 +26,30 @@ export async function generateMetadata(props: {
 export default async function DashboardPage() {
   const session = await auth();
   const userRole = extractPrimaryRole(session?.user?.roles);
+  const stats = session?.user?.tenantId && session?.user?.id
+    ? await getDashboardStats(
+        session.user.tenantId,
+        session.user.id,
+        userRole,
+      )
+    : {
+        totalClients: 0,
+        todaysAppointments: 0,
+        assignedClients: 0,
+        recentActivity: [],
+      };
 
   // Render role-specific dashboard
   switch (userRole) {
     case UserRoles.ADMIN:
-      return <AdminDashboard />;
+      return <AdminDashboard stats={stats} />;
     case UserRoles.THERAPIST:
-      return <TherapistDashboard />;
+      return <TherapistDashboard stats={stats} />;
     case UserRoles.BILLING:
-      return <BillingDashboard />;
+      return <BillingDashboard stats={stats} />;
     case UserRoles.RECEPTIONIST:
-      return <ReceptionistDashboard />;
+      return <ReceptionistDashboard stats={stats} />;
     default:
-      return <TherapistDashboard />;
+      return <TherapistDashboard stats={stats} />;
   }
 }
