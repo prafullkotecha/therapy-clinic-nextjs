@@ -379,13 +379,12 @@ async function seedUsers(
     .insert(users)
     .values(
       userData.map(u =>
-      userFactory.build({
-        ...u,
-        tenantId,
-        passwordHash: hashPasswordSync('Password123!@#'),
-        isActive: true,
-        mfaEnabled: false,
-      }),
+        userFactory.build(tenantId, {
+          ...u,
+          passwordHash: hashPasswordSync('Password123!@#'),
+          isActive: true,
+          mfaEnabled: false,
+        }),
       ),
     )
     .returning({ id: users.id, email: users.email });
@@ -1013,22 +1012,24 @@ async function seedAppointments(
     const startTime = '10:00:00';
     const endTime = '11:00:00';
 
-    return {
-      ...appointmentFactory.build({
-        tenantId,
-        locationId: faker.helpers.arrayElement(locationIds),
-        clientId: clientIds[clientIndex]!,
-        therapistId: therapistIds[therapistIndex]!,
-        appointmentDate: formatDateForPostgres(appointmentDate),
-        startTime,
-        endTime,
-        duration: 60,
-        appointmentType: type,
-        status,
-        isRecurring: false,
-        createdBy: Object.values(userIds)[0]!, // Admin
-      }),
-    };
+      return {
+        ...appointmentFactory.build({
+          tenantId,
+          locationId: faker.helpers.arrayElement(locationIds),
+          clientId: clientIds[clientIndex]!,
+          therapistId: therapistIds[therapistIndex]!,
+          overrides: {
+            appointmentDate: formatDateForPostgres(appointmentDate),
+            startTime,
+            endTime,
+            duration: 60,
+            appointmentType: type as 'initial_assessment' | 'regular_session' | 'family_session' | 'group_session',
+            status: status as 'scheduled' | 'confirmed' | 'checked_in' | 'in_progress' | 'completed' | 'cancelled' | 'no_show',
+            isRecurring: false,
+            createdBy: Object.values(userIds)[0]!, // Admin
+          },
+        }),
+      };
   };
 
   // Past completed appointments
