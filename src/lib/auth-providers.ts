@@ -1,5 +1,8 @@
 export function getEnabledAuthProviders(rawProviders: string | undefined): string[] {
-  return (rawProviders ?? 'keycloak')
+  const normalized = (rawProviders ?? 'keycloak').trim().toLowerCase();
+  const providers = normalized === 'both' ? 'keycloak,credentials' : normalized;
+
+  return providers
     .split(',')
     .map(provider => provider.trim().toLowerCase())
     .filter(Boolean);
