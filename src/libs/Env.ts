@@ -1,6 +1,9 @@
 import { createEnv } from '@t3-oss/env-nextjs';
 import * as z from 'zod';
 
+const resolvedAuthSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+const resolvedAuthUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
+
 export const Env = createEnv({
   server: {
     ARCJET_KEY: z.string().startsWith('ajkey_').optional(),
@@ -38,10 +41,12 @@ export const Env = createEnv({
     KEYCLOAK_REALM: process.env.KEYCLOAK_REALM,
     KEYCLOAK_CLIENT_ID: process.env.KEYCLOAK_CLIENT_ID,
     KEYCLOAK_CLIENT_SECRET: process.env.KEYCLOAK_CLIENT_SECRET,
-    AUTH_SECRET: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
-    AUTH_URL: process.env.AUTH_URL ?? process.env.NEXTAUTH_URL,
-    NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL ?? process.env.AUTH_URL,
+    // Backward compatibility during NextAuth v4 -> Auth.js v5 naming migration.
+    // Canonical precedence is AUTH_* first, then NEXTAUTH_* fallback.
+    AUTH_SECRET: resolvedAuthSecret,
+    AUTH_URL: resolvedAuthUrl,
+    NEXTAUTH_SECRET: resolvedAuthSecret,
+    NEXTAUTH_URL: resolvedAuthUrl,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_BETTER_STACK_SOURCE_TOKEN: process.env.NEXT_PUBLIC_BETTER_STACK_SOURCE_TOKEN,
     NEXT_PUBLIC_BETTER_STACK_INGESTING_HOST: process.env.NEXT_PUBLIC_BETTER_STACK_INGESTING_HOST,

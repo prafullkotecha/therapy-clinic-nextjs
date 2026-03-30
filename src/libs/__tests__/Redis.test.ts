@@ -37,4 +37,20 @@ describe('libs/Redis', () => {
     expect(second.redis).toBe(fakeClient);
     expect(createClientMock).toHaveBeenCalledTimes(1);
   });
+
+  it('does not persist redis client in global cache in production mode', async () => {
+    const firstClient = { kind: 'redis-client-prod-1' };
+    const secondClient = { kind: 'redis-client-prod-2' };
+    process.env.NODE_ENV = 'production';
+    createClientMock.mockReturnValueOnce(firstClient).mockReturnValueOnce(secondClient);
+
+    const first = await import('../Redis');
+    vi.resetModules();
+    const second = await import('../Redis');
+
+    expect(first.redis).toBe(firstClient);
+    expect(second.redis).toBe(secondClient);
+    expect(createClientMock).toHaveBeenCalledTimes(2);
+    expect((globalThis as { redisClient?: unknown }).redisClient).toBeUndefined();
+  });
 });
