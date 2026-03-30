@@ -1,16 +1,22 @@
 import { createEnv } from '@t3-oss/env-nextjs';
 import * as z from 'zod';
 
+const resolvedAuthSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+const resolvedAuthUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
+
 export const Env = createEnv({
   server: {
     ARCJET_KEY: z.string().startsWith('ajkey_').optional(),
     DATABASE_URL: z.string().min(1),
+    REDIS_URL: z.string().url().optional(),
     DEV_BYPASS_AUTH: z.string().optional(),
     AUTH_PROVIDERS: z.string().optional(),
     KEYCLOAK_URL: z.string().url().optional(),
     KEYCLOAK_REALM: z.string().optional(),
     KEYCLOAK_CLIENT_ID: z.string().optional(),
     KEYCLOAK_CLIENT_SECRET: z.string().optional(),
+    AUTH_SECRET: z.string().optional(),
+    AUTH_URL: z.string().url().optional(),
     NEXTAUTH_SECRET: z.string().optional(),
     NEXTAUTH_URL: z.string().url().optional(),
   },
@@ -28,14 +34,19 @@ export const Env = createEnv({
   runtimeEnv: {
     ARCJET_KEY: process.env.ARCJET_KEY,
     DATABASE_URL: process.env.DATABASE_URL,
+    REDIS_URL: process.env.REDIS_URL,
     DEV_BYPASS_AUTH: process.env.DEV_BYPASS_AUTH,
     AUTH_PROVIDERS: process.env.AUTH_PROVIDERS,
     KEYCLOAK_URL: process.env.KEYCLOAK_URL,
     KEYCLOAK_REALM: process.env.KEYCLOAK_REALM,
     KEYCLOAK_CLIENT_ID: process.env.KEYCLOAK_CLIENT_ID,
     KEYCLOAK_CLIENT_SECRET: process.env.KEYCLOAK_CLIENT_SECRET,
-    NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+    // Backward compatibility during NextAuth v4 -> Auth.js v5 naming migration.
+    // Canonical precedence is AUTH_* first, then NEXTAUTH_* fallback.
+    AUTH_SECRET: resolvedAuthSecret,
+    AUTH_URL: resolvedAuthUrl,
+    NEXTAUTH_SECRET: resolvedAuthSecret,
+    NEXTAUTH_URL: resolvedAuthUrl,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_BETTER_STACK_SOURCE_TOKEN: process.env.NEXT_PUBLIC_BETTER_STACK_SOURCE_TOKEN,
     NEXT_PUBLIC_BETTER_STACK_INGESTING_HOST: process.env.NEXT_PUBLIC_BETTER_STACK_INGESTING_HOST,
