@@ -2,11 +2,13 @@ import { eq } from 'drizzle-orm';
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import Keycloak from 'next-auth/providers/keycloak';
+import { cookies } from 'next/headers';
 import { getAuthRequestContext } from '@/lib/auth-context';
 import { getSignOutLookupStrategy } from '@/lib/auth-audit';
 import { getAuthProviderConfig } from '@/lib/auth-providers';
 import { DEV_BYPASS_TOKEN } from '@/lib/constants';
 import { verifyPassword } from '@/lib/password';
+import { validatePasswordComplexity, verifyCsrfToken } from '@/lib/password-policy';
 import { db } from '@/libs/DB';
 import { Env } from '@/libs/Env';
 import { users } from '@/models/user.schema';
@@ -14,12 +16,16 @@ import { logLoginFailed, logLoginSuccess } from '@/services/audit.service';
 import { checkAndLockAccount, clearFailedAttempts, isAccountLocked, recordFailedLoginAttempt } from '@/services/lockout.service';
 
 // Development auth bypass - only enabled when DEV_BYPASS_AUTH=true and NODE_ENV=development
+const normalizedAuthProviders = Env.AUTH_PROVIDERS?.trim().toLowerCase() === 'both'
+  ? 'keycloak,credentials'
+  : Env.AUTH_PROVIDERS;
+
 const {
   isDevBypassEnabled,
   useCredentialsProvider,
   useKeycloakProvider,
 } = getAuthProviderConfig({
-  authProviders: Env.AUTH_PROVIDERS,
+  authProviders: normalizedAuthProviders,
   devBypassAuth: Env.DEV_BYPASS_AUTH,
   nodeEnv: Env.NODE_ENV,
 });
@@ -36,6 +42,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             credentials: {
               email: { label: 'Email', type: 'email' },
               password: { label: 'Password', type: 'password' },
+              csrfToken: { label: 'CSRF Token', type: 'text' },
             },
             async authorize(credentials) {
               if (!credentials?.email || !credentials?.password) {
@@ -44,8 +51,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
               const email = String(credentials.email).toLowerCase().trim();
               const password = String(credentials.password);
-              if (password.length < 12) {
+              const csrfCookieValue = (await cookies()).get('authjs.csrf-token')?.value;
+              const expectedCsrfToken = csrfCookieValue?.split('|')[0];
+              const providedCsrfToken = typeof credentials.csrfToken === 'string'
+                ? credentials.csrfToken
+                : undefined;
+
+              if (!verifyCsrfToken(providedCsrfToken, expectedCsrfToken)) {
                 return null;
+              }
+
+              if (!isDevBypassEnabled) {
+                const complexity = validatePasswordComplexity(password);
+                if (!complexity.isValid) {
+                  return null;
+                }
               }
 
               // Fetch user from database

@@ -18,6 +18,7 @@ export type Resource
   = | 'clients'
     | 'therapists'
     | 'appointments'
+    | 'session_notes'
     | 'users'
     | 'tenants'
     | 'audit_logs'
@@ -36,49 +37,53 @@ const PERMISSIONS: Record<UserRole, Record<Resource, Action[]>> = {
     clients: ['create', 'read', 'update', 'delete'],
     therapists: ['create', 'read', 'update', 'delete'],
     appointments: ['create', 'read', 'update', 'delete'],
+    session_notes: ['create', 'read', 'update', 'delete'],
     users: ['create', 'read', 'update', 'delete'],
     tenants: ['read', 'update'],
     audit_logs: ['read'],
     billing: ['create', 'read', 'update', 'delete'],
     reports: ['read'],
     specializations: ['create', 'read', 'update', 'delete'],
-    matching: ['read'], // Can find therapist matches
+    matching: ['read'],
   },
   therapist: {
-    clients: ['read', 'update'], // Only assigned clients
-    therapists: ['read'], // Can view other therapists (for referrals)
-    appointments: ['create', 'read', 'update'], // Own appointments
-    users: [], // No user management
-    tenants: [], // No tenant access
-    audit_logs: [], // No audit access
-    billing: ['read'], // Can view billing for own clients
-    reports: ['read'], // Own performance reports
-    specializations: ['read'], // Can view specializations
-    matching: ['read'], // Can find matches for own clients
+    clients: ['read', 'update'],
+    therapists: ['read'],
+    appointments: ['create', 'read', 'update'],
+    session_notes: ['create', 'read', 'update'],
+    users: [],
+    tenants: [],
+    audit_logs: [],
+    billing: ['read'],
+    reports: ['read'],
+    specializations: ['read'],
+    matching: ['read'],
   },
   billing: {
-    clients: ['read'], // View client info for billing
-    therapists: ['read'], // View therapist info for billing
-    appointments: ['read'], // View appointments for billing
-    users: [], // No user management
-    tenants: [], // No tenant access
-    audit_logs: [], // No audit access
-    billing: ['create', 'read', 'update'], // Full billing access
-    reports: ['read'], // Billing reports
-    specializations: ['read'], // Can view specializations
-    matching: [], // No matching access
+    clients: ['read'],
+    therapists: ['read'],
+    appointments: ['read'],
+    session_notes: [],
+    users: [],
+    tenants: [],
+    audit_logs: [],
+    billing: ['create', 'read', 'update'],
+    reports: ['read'],
+    specializations: ['read'],
+    matching: [],
   },
   receptionist: {
-    clients: ['create', 'read', 'update'], // Intake and scheduling
-    therapists: ['read'], // View for scheduling
-    appointments: ['create', 'read', 'update', 'delete'], // Full appointment management
-    users: [], // No user management
-    tenants: [], // No tenant access
-    audit_logs: [], // No audit access
-    billing: [], // No billing access
-    reports: [], // No reports
-    specializations: ['read'], // Can view specializations
-    matching: ['read'], // Can find therapist matches during intake
+    clients: ['create', 'read', 'update'],
+    therapists: ['read'],
+    appointments: ['create', 'read', 'update', 'delete'],
+    session_notes: ['read'],
+    users: [],
+    tenants: [],
+    audit_logs: [],
+    billing: [],
+    reports: [],
+    specializations: ['read'],
+    matching: ['read'],
   },
 };
 
@@ -136,7 +141,7 @@ export function checkResourcePermission(
   // For therapists, check ownership
   if (role === UserRoles.THERAPIST) {
     // Therapists can only access resources they own
-    if (resource === 'clients' || resource === 'appointments') {
+    if (resource === 'clients' || resource === 'appointments' || resource === 'session_notes') {
       return resourceOwnerId === userId;
     }
   }
@@ -170,4 +175,22 @@ export function getResourceActions(
   }
 
   return PERMISSIONS[role as UserRole][resource] || [];
+}
+
+export function getPermissionsForRole(role: string): Record<Resource, Action[]> | null {
+  if (!(role in PERMISSIONS)) {
+    return null;
+  }
+
+  return { ...PERMISSIONS[role as UserRole] };
+}
+
+export function hasPermissionOrThrow(
+  role: string | undefined,
+  resource: Resource,
+  action: Action,
+): void {
+  if (!checkPermission(role, resource, action)) {
+    throw new Error(`Forbidden: ${role ?? 'unknown'} cannot ${action} ${resource}`);
+  }
 }
