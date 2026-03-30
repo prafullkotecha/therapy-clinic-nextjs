@@ -38,4 +38,8 @@ ALTER TABLE "consents" ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "tenant_isolation_policy" ON "consents";
 CREATE POLICY "tenant_isolation_policy" ON "consents"
-  USING (tenant_id = current_setting('app.current_tenant', true)::uuid);
+  USING (
+    -- Fail-closed by design: middleware must set app.current_tenant for access.
+    current_setting('app.current_tenant', true) IS NOT NULL
+    AND tenant_id = current_setting('app.current_tenant', true)::uuid
+  );

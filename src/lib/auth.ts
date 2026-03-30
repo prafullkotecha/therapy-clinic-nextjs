@@ -15,6 +15,12 @@ import { users } from '@/models/user.schema';
 import { logLoginFailed, logLoginSuccess } from '@/services/audit.service';
 import { checkAndLockAccount, clearFailedAttempts, isAccountLocked, recordFailedLoginAttempt } from '@/services/lockout.service';
 
+function getExpectedCsrfTokenFromCookie(cookieValue: string | undefined): string | undefined {
+  // NextAuth/Auth.js stores csrf cookie as "<token>|<hash>", so we compare
+  // the submitted credentials token against the first segment.
+  return cookieValue?.split('|')[0];
+}
+
 // Development auth bypass - only enabled when DEV_BYPASS_AUTH=true and NODE_ENV=development
 const normalizedAuthProviders = Env.AUTH_PROVIDERS?.trim().toLowerCase() === 'both'
   ? 'keycloak,credentials'
@@ -52,7 +58,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               const email = String(credentials.email).toLowerCase().trim();
               const password = String(credentials.password);
               const csrfCookieValue = (await cookies()).get('authjs.csrf-token')?.value;
-              const expectedCsrfToken = csrfCookieValue?.split('|')[0];
+              const expectedCsrfToken = getExpectedCsrfTokenFromCookie(csrfCookieValue);
               const providedCsrfToken = typeof credentials.csrfToken === 'string'
                 ? credentials.csrfToken
                 : undefined;

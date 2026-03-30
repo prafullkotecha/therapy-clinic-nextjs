@@ -17,6 +17,9 @@ export type EncryptionServiceConfig = {
 };
 
 function deriveKey(rawKey: string): Buffer {
+  // Accept both pre-generated 32-byte hex keys and passphrase-style inputs:
+  // - 64-char hex keys are decoded directly for deterministic key material.
+  // - Other inputs are normalized with SHA-256 to derive a 32-byte AES key.
   if (rawKey.length === 64 && /^[0-9a-fA-F]+$/.test(rawKey)) {
     return Buffer.from(rawKey, 'hex');
   }

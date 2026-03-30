@@ -182,7 +182,11 @@ export function getPermissionsForRole(role: string): Record<Resource, Action[]> 
     return null;
   }
 
-  return { ...PERMISSIONS[role as UserRole] };
+  const rolePermissions = PERMISSIONS[role as UserRole];
+
+  return Object.fromEntries(
+    Object.entries(rolePermissions).map(([resource, actions]) => [resource, [...actions]]),
+  ) as Record<Resource, Action[]>;
 }
 
 export function hasPermissionOrThrow(
