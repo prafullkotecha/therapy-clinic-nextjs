@@ -28,15 +28,11 @@ export type SessionNoteFilters = {
 };
 
 function encryptOptionalValue(value?: string): string | null {
-  if (!value) {
+  if (value === undefined || value === null) {
     return null;
   }
 
-  try {
-    return getEncryptionServiceSync().encrypt(value);
-  } catch {
-    return value;
-  }
+  return getEncryptionServiceSync().encrypt(value);
 }
 
 function decryptOptionalValue(value: string | null): string | null {
@@ -44,11 +40,7 @@ function decryptOptionalValue(value: string | null): string | null {
     return null;
   }
 
-  try {
-    return getEncryptionServiceSync().decrypt(value);
-  } catch {
-    return value;
-  }
+  return getEncryptionServiceSync().decrypt(value);
 }
 
 export async function createSessionNote(

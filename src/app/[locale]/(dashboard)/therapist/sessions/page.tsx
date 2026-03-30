@@ -2,12 +2,15 @@ import Link from 'next/link';
 import { getAuthContext } from '@/lib/auth-helpers';
 import { getSessionNotes } from '@/services/session.service';
 
-export default async function TherapistSessionsPage() {
+export default async function TherapistSessionsPage(props: {
+  params: Promise<{ locale: string }>;
+}) {
   const { tenantId, userId, hasPermission, isAuthenticated } = await getAuthContext();
   if (!isAuthenticated || !tenantId || !userId || !hasPermission('appointments', 'read')) {
     return <div className="rounded-lg bg-white p-6 text-sm text-gray-700">You are not authorized to view session notes.</div>;
   }
 
+  const { locale } = await props.params;
   const notes = await getSessionNotes(tenantId, userId);
 
   return (
@@ -16,7 +19,7 @@ export default async function TherapistSessionsPage() {
       <ul className="space-y-2 rounded-lg bg-white p-4 shadow-sm">
         {notes.map(note => (
           <li key={note.id} className="rounded border border-gray-100 p-2 text-sm text-gray-700">
-            <Link href={`/dashboard/therapist/sessions/${note.id}`} className="text-primary-700 hover:underline">
+            <Link href={`/${locale}/dashboard/therapist/sessions/${note.id}`} className="text-primary-700 hover:underline">
               {note.sessionDate}
               {' '}
               •

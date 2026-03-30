@@ -17,6 +17,7 @@ type AppointmentItem = {
 
 export default function TherapistAppointmentsPage() {
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<AppointmentItem | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -25,10 +26,12 @@ export default function TherapistAppointmentsPage() {
       const response = await fetch('/api/appointments');
       if (!response.ok) {
         setAppointments([]);
+        setLoadError('Failed to load appointments. Please try again.');
         return;
       }
       const data = await response.json() as AppointmentItem[];
       setAppointments(data);
+      setLoadError(null);
     };
 
     void load();
@@ -50,6 +53,11 @@ export default function TherapistAppointmentsPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold text-gray-900">My Appointments</h1>
+      {loadError ? (
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {loadError}
+        </div>
+      ) : null}
       <AppointmentCalendar events={events} onEventClick={handleEventClick} />
       <AppointmentDetailPanel
         open={open}
