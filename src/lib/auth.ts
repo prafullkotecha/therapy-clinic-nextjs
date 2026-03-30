@@ -3,6 +3,7 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import Keycloak from 'next-auth/providers/keycloak';
 import { getAuthRequestContext } from '@/lib/auth-context';
+import { getSignOutLookupStrategy } from '@/lib/auth-audit';
 import { getAuthProviderConfig } from '@/lib/auth-providers';
 import { DEV_BYPASS_TOKEN } from '@/lib/constants';
 import { verifyPassword } from '@/lib/password';
@@ -207,12 +208,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           token.idToken = DEV_BYPASS_TOKEN;
           token.roles = user.roles || [];
           token.tenantId = user.tenantId as string;
+          token.authProvider = 'credentials';
         } else if (profile) {
           // Keycloak provider
           token.accessToken = account.access_token;
           token.idToken = account.id_token;
           token.roles = (profile as any).realm_access?.roles || [];
           token.tenantId = (profile as any).tenant_id;
+          token.authProvider = 'keycloak';
         }
       }
       return token;
@@ -257,8 +260,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const tenantId = token?.tenantId as string | undefined;
         const tokenSubject = token?.sub as string | undefined;
-        const isDevBypassSession = token?.accessToken === DEV_BYPASS_TOKEN;
-        if (isDevBypassSession && Env.NODE_ENV !== 'development') {
+        const lookupStrategy = getSignOutLookupStrategy({
+          authProvider: token?.authProvider,
+          accessToken: token?.accessToken as string | undefined,
+          nodeEnv: Env.NODE_ENV,
+        });
+
+        if (lookupStrategy === 'skip') {
           return;
         }
 
@@ -268,7 +276,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             .select()
             .from(users)
             .where(
-              isDevBypassSession
+              lookupStrategy === 'id'
                 ? eq(users.id, tokenSubject)
                 : eq(users.keycloakId, tokenSubject),
             )
