@@ -1,4 +1,5 @@
 import { and, desc, eq, sql } from 'drizzle-orm';
+import { formatInTimeZone } from 'date-fns-tz';
 import { withTenantContext } from '@/lib/tenant-db';
 import type { UserRole } from '@/lib/rbac';
 import { UserRoles } from '@/lib/rbac';
@@ -6,6 +7,7 @@ import { db } from '@/libs/DB';
 import { appointments } from '@/models/appointment.schema';
 import { clients } from '@/models/client.schema';
 import { auditLogs } from '@/models/user.schema';
+import { tenants } from '@/models/tenant.schema';
 import { therapists } from '@/models/therapist.schema';
 
 export type DashboardStats = {
@@ -28,8 +30,8 @@ const dashboardStatsCache = new Map<string, { expiresAt: number; value: Dashboar
 // For globally consistent caching across instances, use Redis.
 // Cache invalidation currently relies on TTL expiry only.
 
-export function getTodayDateString(date: Date = new Date()): string {
-  return date.toISOString().split('T')[0]!;
+export function getTodayDateString(timezone: string, date: Date = new Date()): string {
+  return formatInTimeZone(date, timezone, 'yyyy-MM-dd');
 }
 
 export async function getDashboardStats(
@@ -43,9 +45,18 @@ export async function getDashboardStats(
   if (cached && cached.expiresAt > now) {
     return cached.value;
   }
+  if (cached && cached.expiresAt <= now) {
+    dashboardStatsCache.delete(cacheKey);
+  }
 
   const stats = await withTenantContext(tenantId, async () => {
-    const today = getTodayDateString();
+    const [tenant] = await db
+      .select({ timezone: tenants.timezone })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+    const timezone = tenant?.timezone || 'America/New_York';
+    const today = getTodayDateString(timezone);
 
     const [clientCountRow] = await db
       .select({ count: sql<number>`count(*)::int` })

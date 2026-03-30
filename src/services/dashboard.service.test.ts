@@ -40,7 +40,11 @@ describe('dashboard.service', () => {
   const userId = '00000000-0000-0000-0000-000000000002';
 
   it('getTodayDateString should format YYYY-MM-DD', () => {
-    expect(getTodayDateString(new Date('2026-03-23T09:00:00.000Z'))).toBe('2026-03-23');
+    expect(getTodayDateString('America/New_York', new Date('2026-03-23T09:00:00.000Z'))).toBe('2026-03-23');
+  });
+
+  it('getTodayDateString should respect timezone boundaries', () => {
+    expect(getTodayDateString('America/Los_Angeles', new Date('2026-03-23T01:00:00.000Z'))).toBe('2026-03-22');
   });
 
   it('should return therapist-specific assigned client count', async () => {
@@ -54,6 +58,7 @@ describe('dashboard.service', () => {
       }]);
     orderByMock.mockReset().mockReturnValue({ limit: limitMock });
     whereMock.mockReset()
+      .mockImplementationOnce(() => ({ limit: vi.fn().mockResolvedValueOnce([{ timezone: 'America/New_York' }]) }))
       .mockResolvedValueOnce([{ count: 8 }])
       .mockResolvedValueOnce([{ count: 3 }])
       .mockImplementationOnce(() => ({ orderBy: orderByMock }))
@@ -81,6 +86,7 @@ describe('dashboard.service', () => {
     limitMock.mockReset().mockResolvedValueOnce([]);
     orderByMock.mockReset().mockReturnValue({ limit: limitMock });
     whereMock.mockReset()
+      .mockImplementationOnce(() => ({ limit: vi.fn().mockResolvedValueOnce([{ timezone: 'America/New_York' }]) }))
       .mockResolvedValueOnce([{ count: 12 }])
       .mockResolvedValueOnce([{ count: 7 }])
       .mockImplementationOnce(() => ({ orderBy: orderByMock }))
@@ -96,5 +102,38 @@ describe('dashboard.service', () => {
       assignedClients: 9,
       recentActivity: [],
     });
+  });
+
+  it('evicts expired cache entries on read', async () => {
+    const cacheTenantId = '00000000-0000-0000-0000-000000000099';
+    const cacheUserId = '00000000-0000-0000-0000-000000000098';
+    const nowSpy = vi.spyOn(Date, 'now');
+    nowSpy.mockReturnValueOnce(1_000_000).mockReturnValueOnce(1_070_000);
+
+    const therapistLimitMock = vi.fn().mockResolvedValue([{ id: 'therapist-1' }]);
+    limitMock.mockReset().mockResolvedValue([]);
+    orderByMock.mockReset().mockReturnValue({ limit: limitMock });
+    whereMock.mockReset()
+      .mockImplementationOnce(() => ({ limit: vi.fn().mockResolvedValue([{ timezone: 'America/New_York' }]) }))
+      .mockResolvedValueOnce([{ count: 1 }])
+      .mockResolvedValueOnce([{ count: 2 }])
+      .mockImplementationOnce(() => ({ orderBy: orderByMock }))
+      .mockImplementationOnce(() => ({ limit: therapistLimitMock }))
+      .mockResolvedValueOnce([{ count: 3 }])
+      .mockImplementationOnce(() => ({ limit: vi.fn().mockResolvedValue([{ timezone: 'America/New_York' }]) }))
+      .mockResolvedValueOnce([{ count: 1 }])
+      .mockResolvedValueOnce([{ count: 2 }])
+      .mockImplementationOnce(() => ({ orderBy: orderByMock }))
+      .mockImplementationOnce(() => ({ limit: therapistLimitMock }))
+      .mockResolvedValueOnce([{ count: 3 }]);
+    fromMock.mockReset().mockReturnValue({ where: whereMock });
+    selectMock.mockReset().mockReturnValue({ from: fromMock });
+
+    await getDashboardStats(cacheTenantId, cacheUserId, 'therapist');
+    const callsAfterFirst = selectMock.mock.calls.length;
+    await getDashboardStats(cacheTenantId, cacheUserId, 'therapist');
+
+    expect(selectMock.mock.calls.length).toBeGreaterThan(callsAfterFirst);
+    nowSpy.mockRestore();
   });
 });

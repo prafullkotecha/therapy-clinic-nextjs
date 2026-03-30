@@ -28,4 +28,14 @@ describe('auth-providers', () => {
     expect(config.useCredentialsProvider).toBe(true);
     expect(config.useKeycloakProvider).toBe(false);
   });
+
+  it('throws when dev bypass is enabled in production', () => {
+    expect(() =>
+      getAuthProviderConfig({
+        authProviders: 'keycloak,credentials',
+        devBypassAuth: 'true',
+        nodeEnv: 'production',
+      }),
+    ).toThrowError(/DEV_BYPASS_AUTH cannot be enabled in production/);
+  });
 });

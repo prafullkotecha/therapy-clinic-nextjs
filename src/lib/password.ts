@@ -8,6 +8,12 @@ const SCRYPT_R = 8;
 const SCRYPT_P = 1;
 const KEY_LENGTH = 64;
 
+export const PASSWORD_HASH_PARAMS = {
+  n: SCRYPT_N,
+  r: SCRYPT_R,
+  p: SCRYPT_P,
+} as const;
+
 function encodeHash(salt: Buffer, key: Buffer): string {
   return [
     'scrypt',
@@ -84,6 +90,9 @@ export async function verifyPassword(password: string, encodedHash: string): Pro
     return false;
   }
   const { n, r, p, salt, expected } = parsed;
+  if (n !== PASSWORD_HASH_PARAMS.n || r !== PASSWORD_HASH_PARAMS.r || p !== PASSWORD_HASH_PARAMS.p) {
+    return false;
+  }
 
   const actual = await new Promise<Buffer>((resolve, reject) => {
     nodeScrypt(password, salt, expected.length, {

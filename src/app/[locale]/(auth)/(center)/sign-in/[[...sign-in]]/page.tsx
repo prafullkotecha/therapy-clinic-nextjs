@@ -38,7 +38,8 @@ export async function generateMetadata(props: ISignInPageProps): Promise<Metadat
 export default async function SignInPage(props: ISignInPageProps) {
   const { locale } = await props.params;
   const searchParams = props.searchParams ? await props.searchParams : undefined;
-  const loginError = searchParams?.error;
+  const loginErrorCode = searchParams?.error;
+  const loginError = loginErrorCode === 'invalid_credentials' ? 'Invalid credentials' : null;
   setRequestLocale(locale);
   const t = await getTranslations({
     locale,
@@ -87,7 +88,7 @@ export default async function SignInPage(props: ISignInPageProps) {
                     });
                   } catch (error) {
                     if (error instanceof AuthError) {
-                      redirect(`/${locale}/sign-in?error=Invalid credentials`);
+                      redirect(`/${locale}/sign-in?error=invalid_credentials`);
                     }
                     throw error;
                   }

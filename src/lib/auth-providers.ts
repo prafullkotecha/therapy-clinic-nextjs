@@ -14,6 +14,12 @@ export function getAuthProviderConfig(input: {
   useCredentialsProvider: boolean;
   useKeycloakProvider: boolean;
 } {
+  if (input.devBypassAuth === 'true' && input.nodeEnv === 'production') {
+    throw new Error(
+      'SECURITY ERROR: DEV_BYPASS_AUTH cannot be enabled in production.',
+    );
+  }
+
   const enabledProviders = getEnabledAuthProviders(input.authProviders);
   const isDevBypassEnabled
     = input.devBypassAuth === 'true' && input.nodeEnv === 'development';
