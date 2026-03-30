@@ -96,8 +96,9 @@ export default async function middleware(
       = process.env.DEV_BYPASS_AUTH === 'true' && process.env.NODE_ENV === 'development';
     if (!isDevBypassEnabled) {
       const url = request.nextUrl.clone();
-      const locale = url.pathname.split('/')[1] || 'en';
-      url.pathname = `/${locale}/sign-in`;
+      const locale = url.pathname.match(/^\/([^/]+)/)?.at(1);
+      const safeLocale = locale && routing.locales.includes(locale) ? locale : routing.defaultLocale;
+      url.pathname = `/${safeLocale}/sign-in`;
       return NextResponse.redirect(url);
     }
   }

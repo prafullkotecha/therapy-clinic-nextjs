@@ -9,14 +9,19 @@ import { formatDateForPostgres } from './helpers';
 type NewClient = InferInsertModel<typeof clients>;
 
 export const clientFactory = {
-  build(overrides?: Partial<NewClient>): NewClient {
+  build(input: {
+    tenantId: string;
+    primaryLocationId: string;
+    overrides?: Partial<NewClient>;
+  }): NewClient {
+    const { tenantId, primaryLocationId, overrides } = input;
     const encryption = getEncryptionServiceSync();
     const firstName = faker.person.firstName();
     const lastName = faker.person.lastName();
 
     return {
-      tenantId: faker.string.uuid(),
-      primaryLocationId: faker.string.uuid(),
+      tenantId,
+      primaryLocationId,
       firstName: encryption.encrypt(firstName),
       lastName: encryption.encrypt(lastName),
       dateOfBirth: encryption.encrypt(formatDateForPostgres(faker.date.birthdate())),
@@ -30,16 +35,27 @@ export const clientFactory = {
     };
   },
 
-  async create(overrides?: Partial<NewClient>) {
-    const [created] = await db.insert(clients).values(this.build(overrides)).returning();
+  async create(input: {
+    tenantId: string;
+    primaryLocationId: string;
+    overrides?: Partial<NewClient>;
+  }) {
+    const [created] = await db.insert(clients).values(this.build(input)).returning();
     if (!created) {
       throw new Error('Failed to create client');
     }
     return created;
   },
 
-  async createBatch(count: number, overrides?: Partial<NewClient>) {
-    const values = Array.from({ length: count }, () => this.build(overrides));
+  async createBatch(
+    count: number,
+    input: {
+      tenantId: string;
+      primaryLocationId: string;
+      overrides?: Partial<NewClient>;
+    },
+  ) {
+    const values = Array.from({ length: count }, () => this.build(input));
     return db.insert(clients).values(values).returning();
   },
 };

@@ -6,11 +6,17 @@ import { therapists } from '@/models/therapist.schema';
 type NewTherapist = InferInsertModel<typeof therapists>;
 
 export const therapistFactory = {
-  build(overrides?: Partial<NewTherapist>): NewTherapist {
+  build(input: {
+    tenantId: string;
+    userId: string;
+    primaryLocationId: string;
+    overrides?: Partial<NewTherapist>;
+  }): NewTherapist {
+    const { tenantId, userId, primaryLocationId, overrides } = input;
     return {
-      tenantId: faker.string.uuid(),
-      userId: faker.string.uuid(),
-      primaryLocationId: faker.string.uuid(),
+      tenantId,
+      userId,
+      primaryLocationId,
       licenseNumber: faker.string.alphanumeric(8).toUpperCase(),
       licenseState: 'MA',
       credentials: 'LCSW',
@@ -24,16 +30,29 @@ export const therapistFactory = {
     };
   },
 
-  async create(overrides?: Partial<NewTherapist>) {
-    const [created] = await db.insert(therapists).values(this.build(overrides)).returning();
+  async create(input: {
+    tenantId: string;
+    userId: string;
+    primaryLocationId: string;
+    overrides?: Partial<NewTherapist>;
+  }) {
+    const [created] = await db.insert(therapists).values(this.build(input)).returning();
     if (!created) {
       throw new Error('Failed to create therapist');
     }
     return created;
   },
 
-  async createBatch(count: number, overrides?: Partial<NewTherapist>) {
-    const values = Array.from({ length: count }, () => this.build(overrides));
+  async createBatch(
+    count: number,
+    input: {
+      tenantId: string;
+      userId: string;
+      primaryLocationId: string;
+      overrides?: Partial<NewTherapist>;
+    },
+  ) {
+    const values = Array.from({ length: count }, () => this.build(input));
     return db.insert(therapists).values(values).returning();
   },
 };

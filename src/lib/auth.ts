@@ -256,14 +256,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
 
         const tenantId = token?.tenantId as string | undefined;
-        const keycloakId = token?.sub as string | undefined;
+        const tokenSubject = token?.sub as string | undefined;
+        const isDevBypassSession = token?.accessToken === DEV_BYPASS_TOKEN;
+        if (isDevBypassSession && Env.NODE_ENV !== 'development') {
+          return;
+        }
 
-        if (tenantId && keycloakId) {
+        if (tenantId && tokenSubject) {
           // Find user in our database
           const [dbUser] = await db
             .select()
             .from(users)
-            .where(eq(users.keycloakId, keycloakId))
+            .where(
+              isDevBypassSession
+                ? eq(users.id, tokenSubject)
+                : eq(users.keycloakId, tokenSubject),
+            )
             .limit(1);
 
           if (dbUser) {

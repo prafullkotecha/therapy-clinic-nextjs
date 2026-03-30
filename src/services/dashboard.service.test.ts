@@ -47,6 +47,10 @@ describe('dashboard.service', () => {
     expect(getTodayDateString('America/Los_Angeles', new Date('2026-03-23T01:00:00.000Z'))).toBe('2026-03-22');
   });
 
+  it('getTodayDateString should fallback for invalid timezone', () => {
+    expect(getTodayDateString('invalid-timezone', new Date('2026-03-23T09:00:00.000Z'))).toBe('2026-03-23');
+  });
+
   it('should return therapist-specific assigned client count', async () => {
     const therapistLimitMock = vi.fn().mockResolvedValueOnce([{ id: 'therapist-1' }]);
     limitMock.mockReset()

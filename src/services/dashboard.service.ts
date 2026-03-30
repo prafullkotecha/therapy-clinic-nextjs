@@ -24,6 +24,7 @@ export type DashboardStats = {
 
 const CACHE_TTL_MS = 60_000;
 const RECENT_ACTIVITY_LIMIT = 5;
+const DEFAULT_TENANT_TIMEZONE = 'America/New_York';
 const dashboardStatsCache = new Map<string, { expiresAt: number; value: DashboardStats }>();
 // NOTE: This in-memory cache is process-local and best-effort.
 // In multi-instance deployments, each instance has its own cache.
@@ -31,7 +32,12 @@ const dashboardStatsCache = new Map<string, { expiresAt: number; value: Dashboar
 // Cache invalidation currently relies on TTL expiry only.
 
 export function getTodayDateString(timezone: string, date: Date = new Date()): string {
-  return formatInTimeZone(date, timezone, 'yyyy-MM-dd');
+  try {
+    return formatInTimeZone(date, timezone, 'yyyy-MM-dd');
+  } catch {
+    console.warn(`Invalid tenant timezone "${timezone}", falling back to ${DEFAULT_TENANT_TIMEZONE}.`);
+    return formatInTimeZone(date, DEFAULT_TENANT_TIMEZONE, 'yyyy-MM-dd');
+  }
 }
 
 export async function getDashboardStats(
@@ -55,7 +61,7 @@ export async function getDashboardStats(
       .from(tenants)
       .where(eq(tenants.id, tenantId))
       .limit(1);
-    const timezone = tenant?.timezone || 'America/New_York';
+    const timezone = tenant?.timezone || DEFAULT_TENANT_TIMEZONE;
     const today = getTodayDateString(timezone);
 
     const [clientCountRow] = await db

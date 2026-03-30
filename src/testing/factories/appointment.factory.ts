@@ -8,12 +8,25 @@ import { formatDateForPostgres } from './helpers';
 type NewAppointment = InferInsertModel<typeof appointments>;
 
 export const appointmentFactory = {
-  build(overrides?: Partial<NewAppointment>): NewAppointment {
+  build(input: {
+    tenantId: string;
+    locationId: string;
+    clientId: string;
+    therapistId: string;
+    overrides?: Partial<NewAppointment>;
+  }): NewAppointment {
+    const {
+      tenantId,
+      locationId,
+      clientId,
+      therapistId,
+      overrides,
+    } = input;
     return {
-      tenantId: faker.string.uuid(),
-      locationId: faker.string.uuid(),
-      clientId: faker.string.uuid(),
-      therapistId: faker.string.uuid(),
+      tenantId,
+      locationId,
+      clientId,
+      therapistId,
       appointmentDate: formatDateForPostgres(new Date()),
       startTime: '10:00:00',
       endTime: '11:00:00',
@@ -24,16 +37,31 @@ export const appointmentFactory = {
     };
   },
 
-  async create(overrides?: Partial<NewAppointment>) {
-    const [created] = await db.insert(appointments).values(this.build(overrides)).returning();
+  async create(input: {
+    tenantId: string;
+    locationId: string;
+    clientId: string;
+    therapistId: string;
+    overrides?: Partial<NewAppointment>;
+  }) {
+    const [created] = await db.insert(appointments).values(this.build(input)).returning();
     if (!created) {
       throw new Error('Failed to create appointment');
     }
     return created;
   },
 
-  async createBatch(count: number, overrides?: Partial<NewAppointment>) {
-    const values = Array.from({ length: count }, () => this.build(overrides));
+  async createBatch(
+    count: number,
+    input: {
+      tenantId: string;
+      locationId: string;
+      clientId: string;
+      therapistId: string;
+      overrides?: Partial<NewAppointment>;
+    },
+  ) {
+    const values = Array.from({ length: count }, () => this.build(input));
     return db.insert(appointments).values(values).returning();
   },
 };
