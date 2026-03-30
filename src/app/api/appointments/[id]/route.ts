@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth-helpers';
 import {
+  cancelAppointment,
   getAppointmentById,
   updateAppointment,
 } from '@/services/appointment';
@@ -95,6 +96,50 @@ export async function PATCH(
     return NextResponse.json(updated);
   } catch (error) {
     console.error('Error updating appointment:', error);
+
+    if (error instanceof Error) {
+      if (error.message === 'Appointment not found') {
+        return NextResponse.json({ error: error.message }, { status: 404 });
+      }
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * DELETE /api/appointments/[id]
+ * Soft-delete by cancelling an appointment
+ */
+export async function DELETE(
+  _request: NextRequest,
+  context: RouteContext,
+): Promise<NextResponse> {
+  try {
+    const { tenantId, userId, hasPermission, isAuthenticated }
+      = await getAuthContext();
+
+    if (!isAuthenticated || !tenantId || !userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!hasPermission('appointments', 'delete')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const params = await context.params;
+    const deleted = await cancelAppointment(tenantId, userId, params.id, {
+      reason: 'deleted',
+      note: 'Deleted via API',
+    });
+
+    return NextResponse.json(deleted);
+  } catch (error) {
+    console.error('Error deleting appointment:', error);
 
     if (error instanceof Error) {
       if (error.message === 'Appointment not found') {
