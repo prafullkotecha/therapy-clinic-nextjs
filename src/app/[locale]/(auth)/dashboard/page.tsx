@@ -9,6 +9,8 @@ import { UserRoles } from '@/lib/rbac';
 import { extractPrimaryRole } from '@/lib/role-utils';
 import { getDashboardStats } from '@/services/dashboard.service';
 
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata(props: {
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {

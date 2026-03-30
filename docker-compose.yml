@@ -11,6 +11,7 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/docker/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
     healthcheck:
       test: [CMD-SHELL, pg_isready -U postgres]
       interval: 10s
@@ -24,7 +25,7 @@ services:
     command: start-dev
     environment:
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/therapy_clinic_dev
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: postgres
       KC_DB_PASSWORD: postgres
       KC_HOSTNAME: localhost
@@ -38,6 +39,9 @@ services:
       - '8080:8080'
     extra_hosts:
       - 'host.docker.internal:host-gateway'
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: [CMD, curl, -f, 'http://localhost:8080/health/ready']
       interval: 30s
@@ -49,13 +53,28 @@ services:
     image: redis:7-alpine
     container_name: therapy-clinic-redis
     restart: unless-stopped
+    command: >
+      sh -c 'if [ -n "$${REDIS_PASSWORD}" ]; then
+      redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}";
+      else
+      redis-server --appendonly yes;
+      fi'
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     ports:
       - '6379:6379'
+    volumes:
+      - redis_data:/data
     healthcheck:
-      test: [CMD, redis-cli, ping]
+      test:
+        [
+          CMD-SHELL,
+          if [ -n "$${REDIS_PASSWORD}" ]; then redis-cli -a "$${REDIS_PASSWORD}" ping; else redis-cli ping; fi,
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
 
 volumes:
   postgres_data:
+  redis_data:
