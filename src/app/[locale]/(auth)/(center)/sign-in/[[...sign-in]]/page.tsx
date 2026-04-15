@@ -3,9 +3,9 @@ import { AuthError } from 'next-auth';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
-import { getAuthProviderConfig } from '@/lib/auth-providers';
 import { Card, CardBody } from '@/components/ui/Card';
 import { auth, signIn } from '@/lib/auth';
+import { getAuthProviderConfig } from '@/lib/auth-providers';
 
 const {
   isDevBypassEnabled,
@@ -104,7 +104,7 @@ export default async function SignInPage(props: ISignInPageProps) {
                     type="email"
                     required
                     autoComplete="email"
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -118,7 +118,7 @@ export default async function SignInPage(props: ISignInPageProps) {
                     required
                     autoComplete="current-password"
                     minLength={12}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 focus:outline-none"
                   />
                   <p className="mt-1 text-xs text-gray-500">Minimum 12 characters.</p>
                 </div>

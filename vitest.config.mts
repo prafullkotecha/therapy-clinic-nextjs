@@ -4,9 +4,17 @@ import { loadEnv } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import { defineConfig } from 'vitest/config';
 
+const viteEnv = loadEnv('', process.cwd(), '');
+/** Matches `.env.example` / docker-compose Postgres for local dev and CI. */
+const defaultDatabaseUrl = 'postgresql://postgres:postgres@127.0.0.1:5432/therapy_clinic_dev';
+/** Optional override for the URL injected into the Vitest `env` map. */
+const vitestDatabaseUrl
+  = process.env.VITEST_DATABASE_URL?.trim() || defaultDatabaseUrl;
+
 export default defineConfig({
   plugins: [react(), tsconfigPaths()],
   test: {
+    globalSetup: ['./vitest.global-setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'text-summary'],
@@ -58,6 +66,9 @@ export default defineConfig({
         },
       },
     ],
-    env: loadEnv('', process.cwd(), ''),
+    env: {
+      ...viteEnv,
+      DATABASE_URL: vitestDatabaseUrl,
+    },
   },
 });

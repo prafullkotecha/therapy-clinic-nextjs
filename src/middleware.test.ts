@@ -37,6 +37,7 @@ describe('middleware dev-login locale fallback', () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe('http://localhost:3000/en/sign-in');
+
     vi.unstubAllEnvs();
   });
 });

@@ -131,8 +131,11 @@ describe('PHIEncryptionService', () => {
     it('should throw error for tampered ciphertext', () => {
       const ciphertext = service.encrypt('test');
       const parts = ciphertext.split(':');
-      // Tamper with the encrypted data
-      parts[3] = parts[3]!.replace('a', 'b');
+      // Tamper with the encrypted payload (flip last hex digit so auth fails reliably)
+      const encryptedHex = parts[3]!;
+      const last = encryptedHex[encryptedHex.length - 1]!;
+      const flippedLast = last === '0' ? '1' : '0';
+      parts[3] = `${encryptedHex.slice(0, -1)}${flippedLast}`;
       const tamperedCiphertext = parts.join(':');
 
       expect(() => service.decrypt(tamperedCiphertext)).toThrow();
@@ -141,8 +144,10 @@ describe('PHIEncryptionService', () => {
     it('should throw error for tampered auth tag', () => {
       const ciphertext = service.encrypt('test');
       const parts = ciphertext.split(':');
-      // Tamper with the auth tag
-      parts[2] = parts[2]!.replace('a', 'b');
+      const authTagHex = parts[2]!;
+      const last = authTagHex[authTagHex.length - 1]!;
+      const flippedLast = last === '0' ? '1' : '0';
+      parts[2] = `${authTagHex.slice(0, -1)}${flippedLast}`;
       const tamperedCiphertext = parts.join(':');
 
       expect(() => service.decrypt(tamperedCiphertext)).toThrow();

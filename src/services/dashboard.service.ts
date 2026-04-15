@@ -1,14 +1,14 @@
-import { and, desc, eq, sql } from 'drizzle-orm';
-import { formatInTimeZone } from 'date-fns-tz';
-import { withTenantContext } from '@/lib/tenant-db';
 import type { UserRole } from '@/lib/rbac';
+import { formatInTimeZone } from 'date-fns-tz';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { UserRoles } from '@/lib/rbac';
+import { withTenantContext } from '@/lib/tenant-db';
 import { db } from '@/libs/DB';
 import { appointments } from '@/models/appointment.schema';
 import { clients } from '@/models/client.schema';
-import { auditLogs } from '@/models/user.schema';
 import { tenants } from '@/models/tenant.schema';
 import { therapists } from '@/models/therapist.schema';
+import { auditLogs } from '@/models/user.schema';
 
 export type DashboardStats = {
   totalClients: number;

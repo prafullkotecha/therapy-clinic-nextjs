@@ -1,6 +1,6 @@
+import type { DashboardStats } from '@/services/dashboard.service';
 import { CalendarIcon, CreditCardIcon, UsersIcon } from '@heroicons/react/24/outline';
 import { Card } from '@/components/ui/Card';
-import type { DashboardStats } from '@/services/dashboard.service';
 
 type AdminDashboardProps = {
   stats: DashboardStats;

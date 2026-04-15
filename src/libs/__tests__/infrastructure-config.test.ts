@@ -12,7 +12,7 @@ describe('infrastructure and docs configuration', () => {
     expect(compose).toContain('depends_on:');
     expect(compose).toContain('condition: service_healthy');
     expect(compose).toContain('redis_data:/data');
-    expect(compose).toContain('REDIS_PASSWORD: ${REDIS_PASSWORD:-}');
+    expect(compose).toContain('REDIS_PASSWORD: $' + '{REDIS_PASSWORD:-}');
   });
 
   it('env templates include required local placeholders', () => {
@@ -52,6 +52,6 @@ describe('infrastructure and docs configuration', () => {
       'utf8',
     );
 
-    expect(dashboardPage).toContain("export const dynamic = 'force-dynamic';");
+    expect(dashboardPage).toContain('export const dynamic = \'force-dynamic\';');
   });
 });

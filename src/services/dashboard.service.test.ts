@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getTodayDateString, getDashboardStats } from './dashboard.service';
+import { getDashboardStats, getTodayDateString } from './dashboard.service';
 
 const withTenantContextMock = vi.fn(async (tenantId: string, operation: (db: unknown) => Promise<unknown>) => {
   void tenantId;
@@ -138,6 +138,7 @@ describe('dashboard.service', () => {
     await getDashboardStats(cacheTenantId, cacheUserId, 'therapist');
 
     expect(selectMock.mock.calls.length).toBeGreaterThan(callsAfterFirst);
+
     nowSpy.mockRestore();
   });
 });

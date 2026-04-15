@@ -80,6 +80,12 @@ npm run db:migrate
 npm run db:seed
 ```
 
+## Testing
+
+- **PostgreSQL**: Several unit tests talk to a real database. Start Postgres (for example `docker compose up -d postgres`) and ensure `DATABASE_URL` in `.env.local` or `.env` matches the server password and database name (see `.env.example`).
+- **Default URL**: If `DATABASE_URL` is not set at all, `vitest.global-setup.ts` sets it to the same connection string as `.env.example` so `Env` and `db` load correctly. If you already set `DATABASE_URL`, that value is used—fix the password in `.env.local` if you see `password authentication failed for user "postgres"`.
+- **Migrations**: `npm run db:migrate` loads `.env.local` then `.env` via `dotenv-cli` so `DATABASE_URL` is available to Drizzle.
+
 ## Contributing
 
 1. Create a feature branch.

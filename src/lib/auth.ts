@@ -1,9 +1,10 @@
+import type { JWT } from 'next-auth/jwt';
 import { eq } from 'drizzle-orm';
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import Keycloak from 'next-auth/providers/keycloak';
-import { getAuthRequestContext } from '@/lib/auth-context';
 import { getSignOutLookupStrategy } from '@/lib/auth-audit';
+import { getAuthRequestContext } from '@/lib/auth-context';
 import { getAuthProviderConfig } from '@/lib/auth-providers';
 import { DEV_BYPASS_TOKEN } from '@/lib/constants';
 import { verifyPassword } from '@/lib/password';
@@ -12,6 +13,12 @@ import { Env } from '@/libs/Env';
 import { users } from '@/models/user.schema';
 import { logLoginFailed, logLoginSuccess } from '@/services/audit.service';
 import { checkAndLockAccount, clearFailedAttempts, isAccountLocked, recordFailedLoginAttempt } from '@/services/lockout.service';
+
+/** Custom claims we map from Keycloak into the JWT (see Keycloak mapper / token script). */
+type KeycloakProfileClaims = {
+  tenant_id?: string;
+  realm_access?: { roles?: string[] };
+};
 
 // Development auth bypass - only enabled when DEV_BYPASS_AUTH=true and NODE_ENV=development
 const {
@@ -150,7 +157,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         // Keycloak provider
         if (account && profile) {
-          const tenantId = (profile as any).tenant_id as string | undefined;
+          const keycloakProfile = profile as KeycloakProfileClaims;
+          const tenantId = keycloakProfile.tenant_id;
           const keycloakId = user.id;
 
           if (tenantId && keycloakId) {
@@ -211,10 +219,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           token.authProvider = 'credentials';
         } else if (profile) {
           // Keycloak provider
+          const keycloakProfile = profile as KeycloakProfileClaims;
           token.accessToken = account.access_token;
           token.idToken = account.id_token;
-          token.roles = (profile as any).realm_access?.roles || [];
-          token.tenantId = (profile as any).tenant_id;
+          token.roles = keycloakProfile.realm_access?.roles ?? [];
+          token.tenantId = keycloakProfile.tenant_id;
           token.authProvider = 'keycloak';
         }
       }
@@ -252,18 +261,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       // Log logout event
       try {
         // NextAuth v5 signOut event provides either session or token
-        const token = 'token' in message ? message.token : null;
+        const rawToken = 'token' in message ? message.token : null;
 
-        if (!token) {
+        if (!rawToken) {
           return;
         }
 
-        const tenantId = token?.tenantId as string | undefined;
-        const tokenSubject = token?.sub as string | undefined;
+        const token = rawToken as JWT;
+        const tenantId = token.tenantId;
+        const tokenSubject = token.sub;
         const lookupStrategy = getSignOutLookupStrategy({
-          authProvider: token?.authProvider,
-          accessToken: token?.accessToken as string | undefined,
-          nodeEnv: Env.NODE_ENV,
+          authProvider: token.authProvider,
+          accessToken: token.accessToken,
+          nodeEnv: Env.NODE_ENV ?? 'development',
         });
 
         if (lookupStrategy === 'skip') {

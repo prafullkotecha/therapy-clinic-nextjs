@@ -1,4 +1,5 @@
-import { randomBytes, scrypt as nodeScrypt, scryptSync, timingSafeEqual } from 'node:crypto';
+import { Buffer } from 'node:buffer';
+import { scrypt as nodeScrypt, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 // OWASP-recommended interactive login baseline for scrypt (2024):
 // N=2^14, r=8, p=1. This provides strong password hashing resistance
