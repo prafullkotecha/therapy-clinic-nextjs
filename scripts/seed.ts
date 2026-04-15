@@ -379,9 +379,8 @@ async function seedUsers(
     .insert(users)
     .values(
       userData.map(u =>
-      userFactory.build({
+      userFactory.build(tenantId, {
         ...u,
-        tenantId,
         passwordHash: hashPasswordSync('Password123!@#'),
         isActive: true,
         mfaEnabled: false,
@@ -1004,8 +1003,8 @@ async function seedAppointments(
     clientIndex: number,
     therapistIndex: number,
     daysOffset: number,
-    status: string,
-    type: string,
+    status: (typeof AppointmentStatus)[keyof typeof AppointmentStatus],
+    type: (typeof AppointmentType)[keyof typeof AppointmentType],
   ) => {
     const appointmentDate = new Date(now);
     appointmentDate.setDate(appointmentDate.getDate() + daysOffset);
@@ -1019,14 +1018,16 @@ async function seedAppointments(
         locationId: faker.helpers.arrayElement(locationIds),
         clientId: clientIds[clientIndex]!,
         therapistId: therapistIds[therapistIndex]!,
-        appointmentDate: formatDateForPostgres(appointmentDate),
-        startTime,
-        endTime,
-        duration: 60,
-        appointmentType: type,
-        status,
-        isRecurring: false,
-        createdBy: Object.values(userIds)[0]!, // Admin
+        overrides: {
+          appointmentDate: formatDateForPostgres(appointmentDate),
+          startTime,
+          endTime,
+          duration: 60,
+          appointmentType: type,
+          status,
+          isRecurring: false,
+          createdBy: Object.values(userIds)[0]!, // Admin
+        },
       }),
     };
   };

@@ -6,6 +6,7 @@ declare module 'next-auth' {
   // eslint-disable-next-line ts/consistent-type-definitions
   interface Session {
     user: {
+      id: string;
       roles: string[];
       tenantId: string;
     } & DefaultSession['user'];

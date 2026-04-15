@@ -85,5 +85,6 @@ npm run db:seed
 1. Create a feature branch.
 2. Keep changes minimal and scoped to the issue.
 3. Add or update Vitest tests for all changed behavior.
-4. Run targeted tests locally, then run broader checks (`npm run test:unit`, `npm run build`).
-5. Open a pull request with a clear summary and linked issue numbers.
+4. TypeScript rule: never use the `any` type in application or test code.
+5. Run targeted tests locally, then run broader checks (`npm run test:unit`, `npm run build`).
+6. Open a pull request with a clear summary and linked issue numbers.

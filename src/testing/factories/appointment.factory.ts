@@ -1,5 +1,4 @@
 import type { InferInsertModel } from 'drizzle-orm';
-import { faker } from '@faker-js/faker';
 import { db } from '@/libs/DB';
 import { appointments } from '@/models/appointment.schema';
 import { AppointmentStatus, AppointmentType } from '@/models/types';
